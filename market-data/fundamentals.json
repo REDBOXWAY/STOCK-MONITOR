@@ -1,0 +1,16 @@
+{
+  "AAPL": {"marketCap": 4849208188600, "peRatio": 38.59117305458769},
+  "AMAT": {"marketCap": 362269296755, "peRatio": 41.841429880843265},
+  "AMZN": {"marketCap": 2769709599018, "peRatio": 34.98365122615804},
+  "ANET": {"marketCap": 251727827494, "peRatio": 63.16139240506329},
+  "ASML": {"marketCap": 654554820470, "peRatio": 52.84069695084007},
+  "CAT": {"marketCap": 376276073889, "peRatio": 34.36481947942905},
+  "CME": {"marketCap": 99078470127, "peRatio": 23.35084745762712},
+  "GLD": {"marketCap": 108904087000, "peRatio": null},
+  "GOOGL": {"marketCap": 4139855000000, "peRatio": 17.001506780512305},
+  "LRCX": {"marketCap": 373168948620, "peRatio": 51.24054982817869},
+  "MU": {"marketCap": 1101451964444, "peRatio": 21.945544554455445},
+  "NVDA": {"marketCap": 5260789000000, "peRatio": 31.636231884057967},
+  "PLTR": {"marketCap": 401695403460, "peRatio": 170.64285714285714},
+  "RTX": {"marketCap": 266424829906, "peRatio": 28.56647398843931}
+}
