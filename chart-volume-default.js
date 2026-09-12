@@ -25,6 +25,9 @@
         save_image:false,
         backgroundColor:'#050b0e',
         gridColor:'rgba(120,145,155,.10)',
+        overrides:{
+          'scalesProperties.fontSize':18
+        },
         container_id:'tvChart'
       });
     }catch{
