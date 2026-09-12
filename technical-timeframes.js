@@ -36,7 +36,22 @@
     const angle = -90 + ((Math.max(-100,Math.min(100,result.score))+100)/200)*180;
     const center = {x:360,y:292};
     const needle = polar(center.x,center.y,150,angle);
-    const segs = [[-90,-54,'#ff4058'],[-54,-18,'#ff9e32'],[-18,18,'#76848b'],[18,54,'#00bfa5'],[54,90,'#00e6b3']];
+    const BUY_COLOR = '#00E6B3';
+    const STRONG_BUY_COLOR = '#006B4F';
+    const SELL_COLOR = '#FF9E32';
+    const STRONG_SELL_COLOR = '#FF4058';
+    const NEUTRAL_COLOR = '#76848B';
+    const segs = [
+      [-90,-54,STRONG_SELL_COLOR],
+      [-54,-18,SELL_COLOR],
+      [-18,18,NEUTRAL_COLOR],
+      [18,54,BUY_COLOR],
+      [54,90,STRONG_BUY_COLOR]
+    ];
+    const ratingColor = result.rating === 'STRONG BUY' ? STRONG_BUY_COLOR :
+      result.rating === 'BUY' ? BUY_COLOR :
+      result.rating === 'STRONG SELL' ? STRONG_SELL_COLOR :
+      result.rating === 'SELL' ? SELL_COLOR : '#D2D9DC';
     const cls = name => `gauge-label${result.rating===name?' active':''}`;
     const tfButtons = TECH_TIMEFRAMES.map(tf => `<button class="tf-btn ${technicalTimeframeMode===tf?'active':''}" type="button" data-tf="${tf}">${tf}</button>`).join('');
 
@@ -49,11 +64,11 @@
         <svg class="gauge-svg" viewBox="0 0 720 370" role="img" aria-label="${result.rating}">
           ${segs.map(([a,b,c])=>`<path d="${arcPath(center.x,center.y,154,a,b)}" fill="none" stroke="${c}" stroke-width="28" stroke-linecap="round"/>`).join('')}
           <text x="105" y="225" text-anchor="middle" class="${cls('STRONG SELL')}"><tspan x="105" dy="0">STRONG</tspan><tspan x="105" dy="34">SELL</tspan></text>
-          <text x="255" y="165" text-anchor="middle" class="${cls('SELL')}">SELL</text>
+          <text x="230" y="148" text-anchor="middle" class="${cls('SELL')}">SELL</text>
           <text x="360" y="118" text-anchor="middle" class="${cls('NEUTRAL')}">NEUTRAL</text>
-          <text x="465" y="165" text-anchor="middle" class="${cls('BUY')}">BUY</text>
+          <text x="490" y="148" text-anchor="middle" class="${cls('BUY')}">BUY</text>
           <text x="615" y="225" text-anchor="middle" class="${cls('STRONG BUY')}"><tspan x="615" dy="0">STRONG</tspan><tspan x="615" dy="34">BUY</tspan></text>
-          <line x1="${center.x}" y1="${center.y}" x2="${needle.x}" y2="${needle.y}" stroke="${gaugeColor(result.rating)}" stroke-width="6" stroke-linecap="round"/>
+          <line x1="${center.x}" y1="${center.y}" x2="${needle.x}" y2="${needle.y}" stroke="${ratingColor}" stroke-width="6" stroke-linecap="round"/>
           <circle cx="${center.x}" cy="${center.y}" r="12" fill="#fff"/>
         </svg>
       </div>
