@@ -34,12 +34,3 @@ input {
 .empty-note {
   font-size: 34px !important;
 }
-
-/* EXCEPTIONS: preserve current sizes */
-.brand,
-.brand span,
-.ticker,
-.quote-price,
-.quote-price small {
-  font-size: revert-layer;
-}
