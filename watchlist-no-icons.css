@@ -1,1 +1,40 @@
-.watchlist .symbol-cell img{display:none!important}.watchlist .symbol-cell{gap:0!important}.watchlist .symbol-cell span{margin-left:0!important;padding-left:0!important}
+.watchlist .symbol-cell img{display:none!important}
+.watchlist .symbol-cell{gap:0!important;min-width:0!important}
+.watchlist .symbol-cell span{margin-left:0!important;padding-left:0!important}
+
+/* EVEN SPACING: TICKER / LAST / CHG / CHG% */
+.watchlist .watch-columns,
+.watchlist .watch-row{
+  grid-template-columns:repeat(4,minmax(0,1fr)) 24px!important;
+  column-gap:8px!important;
+  padding-left:14px!important;
+  padding-right:8px!important;
+}
+
+.watchlist .watch-columns>div:first-child,
+.watchlist .watch-row>.symbol-cell{
+  text-align:left!important;
+}
+
+.watchlist .watch-columns>div:nth-child(2),
+.watchlist .watch-columns>div:nth-child(3),
+.watchlist .watch-columns>div:nth-child(4),
+.watchlist .watch-row>.num{
+  text-align:right!important;
+}
+
+.watchlist .delete-btn{
+  width:24px!important;
+  min-width:24px!important;
+}
+
+@media(max-width:520px){
+  .watchlist .watch-columns,
+  .watchlist .watch-row{
+    grid-template-columns:repeat(4,minmax(0,1fr)) 22px!important;
+    column-gap:5px!important;
+    padding-left:10px!important;
+    padding-right:6px!important;
+  }
+  .watchlist .delete-btn{width:22px!important;min-width:22px!important}
+}
