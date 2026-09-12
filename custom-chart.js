@@ -99,11 +99,11 @@
       const LC=window.LightweightCharts;
       chartApi=LC.createChart(container,{
         autoSize:true,
-        attributionLogo:false,
         layout:{
           background:{type:LC.ColorType.Solid,color:'#050b0e'},
           textColor:'#c8d0d4',
-          fontSize:18
+          fontSize:18,
+          attributionLogo:false
         },
         grid:{
           vertLines:{color:'rgba(120,145,155,.08)'},
