@@ -1,0 +1,45 @@
+/* STOCK MONITOR typography override
+   Keep STOCK MONITOR, selected ticker, current price and USD at their existing sizes.
+   Set all other interface text to 34px. */
+
+html,
+body,
+button,
+input {
+  font-size: 34px;
+}
+
+.search-input,
+.add-btn,
+.watch-title,
+.watch-count,
+.watch-columns,
+.watch-row,
+.company-name,
+.tag,
+.quote-change,
+.last-update,
+.range-btn,
+.metric-label,
+.metric-value,
+.technical-status,
+.gauge-label,
+.gauge-label.active,
+.gauge-main,
+.gauge-score,
+.gauge-count span,
+.gauge-count strong,
+.performance h2,
+.perf-row,
+.empty-note {
+  font-size: 34px !important;
+}
+
+/* EXCEPTIONS: preserve current sizes */
+.brand,
+.brand span,
+.ticker,
+.quote-price,
+.quote-price small {
+  font-size: revert-layer;
+}
