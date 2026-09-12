@@ -34,8 +34,8 @@
   renderGauge = function(result){
     const host = document.getElementById('techHost');
     const angle = -90 + ((Math.max(-100,Math.min(100,result.score))+100)/200)*180;
-    const center = {x:360,y:292};
-    const needle = polar(center.x,center.y,150,angle);
+    const center = {x:360,y:240};
+    const needle = polar(center.x,center.y,145,angle);
     const BUY_COLOR = '#00E6B3';
     const STRONG_BUY_COLOR = '#006B4F';
     const SELL_COLOR = '#FF9E32';
@@ -63,11 +63,11 @@
       <div class="gauge-wrap">
         <svg class="gauge-svg" viewBox="0 0 720 370" role="img" aria-label="${result.rating}">
           ${segs.map(([a,b,c])=>`<path d="${arcPath(center.x,center.y,154,a,b)}" fill="none" stroke="${c}" stroke-width="28" stroke-linecap="round"/>`).join('')}
-          <text x="105" y="225" text-anchor="middle" class="${cls('STRONG SELL')}"><tspan x="105" dy="0">STRONG</tspan><tspan x="105" dy="34">SELL</tspan></text>
-          <text x="230" y="148" text-anchor="middle" class="${cls('SELL')}">SELL</text>
-          <text x="360" y="118" text-anchor="middle" class="${cls('NEUTRAL')}">NEUTRAL</text>
-          <text x="490" y="148" text-anchor="middle" class="${cls('BUY')}">BUY</text>
-          <text x="615" y="225" text-anchor="middle" class="${cls('STRONG BUY')}"><tspan x="615" dy="0">STRONG</tspan><tspan x="615" dy="34">BUY</tspan></text>
+          <text x="72" y="183" text-anchor="middle" class="${cls('STRONG SELL')}"><tspan x="72" dy="0">STRONG</tspan><tspan x="72" dy="34">SELL</tspan></text>
+          <text x="205" y="96" text-anchor="middle" class="${cls('SELL')}">SELL</text>
+          <text x="360" y="46" text-anchor="middle" class="${cls('NEUTRAL')}">NEUTRAL</text>
+          <text x="515" y="96" text-anchor="middle" class="${cls('BUY')}">BUY</text>
+          <text x="648" y="183" text-anchor="middle" class="${cls('STRONG BUY')}"><tspan x="648" dy="0">STRONG</tspan><tspan x="648" dy="34">BUY</tspan></text>
           <line x1="${center.x}" y1="${center.y}" x2="${needle.x}" y2="${needle.y}" stroke="${ratingColor}" stroke-width="6" stroke-linecap="round"/>
           <circle cx="${center.x}" cy="${center.y}" r="12" fill="#fff"/>
         </svg>
