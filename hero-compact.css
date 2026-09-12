@@ -1,0 +1,94 @@
+/* COMPACT ONE-LINE HERO: logo/ticker/tags/price/change on one row, chart uses freed space */
+.hero{
+  display:flex!important;
+  align-items:center!important;
+  gap:14px!important;
+  padding:4px 8px 2px!important;
+  min-height:0!important;
+}
+
+.company{
+  display:flex!important;
+  align-items:center!important;
+  gap:12px!important;
+  min-width:0!important;
+  flex:1 1 auto!important;
+}
+
+.company>div{
+  display:flex!important;
+  align-items:center!important;
+  gap:12px!important;
+  min-width:0!important;
+}
+
+.company-logo{
+  width:72px!important;
+  height:72px!important;
+  flex:0 0 72px!important;
+}
+
+.ticker{
+  margin:0!important;
+  white-space:nowrap!important;
+}
+
+.company-name{
+  display:none!important;
+}
+
+.tags{
+  margin:0!important;
+  display:flex!important;
+  align-items:center!important;
+  flex-wrap:nowrap!important;
+  gap:8px!important;
+}
+
+.tag{
+  white-space:nowrap!important;
+}
+
+.quote{
+  margin-left:auto!important;
+  padding:0!important;
+  display:flex!important;
+  align-items:center!important;
+  gap:16px!important;
+  white-space:nowrap!important;
+}
+
+.quote-price{
+  white-space:nowrap!important;
+}
+
+.quote-change{
+  margin:0!important;
+  white-space:nowrap!important;
+}
+
+.last-update{
+  display:none!important;
+}
+
+/* Give the released vertical space to the chart */
+#chartHost{
+  height:430px!important;
+}
+
+@media(max-width:1180px){
+  .hero{gap:10px!important}
+  .company>div{gap:9px!important}
+  .tags{gap:6px!important}
+  .quote{gap:10px!important}
+  .tag{font-size:28px!important;padding:5px 8px!important}
+  #chartHost{height:410px!important}
+}
+
+@media(max-width:900px){
+  .hero{flex-wrap:wrap!important;align-items:flex-start!important}
+  .quote{width:100%!important;margin-left:84px!important;justify-content:flex-start!important}
+  .company>div{flex-wrap:wrap!important}
+  .tags{flex-wrap:wrap!important}
+  #chartHost{height:390px!important}
+}
