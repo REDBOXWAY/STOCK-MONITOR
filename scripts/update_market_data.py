@@ -46,17 +46,19 @@ def parse_date(value):
 
 def fetch_rows(ticker, assetclass):
     now = datetime.now(timezone.utc)
-    start = now - timedelta(days=800)
+    # About 20 years of daily history so WEEK and MONTH calculations can use
+    # long moving averages such as SMA/EMA 100 and 200.
+    start = now - timedelta(days=7305)
     params = urllib.parse.urlencode({
         'assetclass': assetclass,
         'fromdate': start.strftime('%Y-%m-%d'),
         'todate': now.strftime('%Y-%m-%d'),
-        'limit': 800,
+        'limit': 5000,
     })
     symbol = urllib.parse.quote(ticker)
     url = f'https://api.nasdaq.com/api/quote/{symbol}/historical?{params}'
     req = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=30) as r:
+    with urllib.request.urlopen(req, timeout=45) as r:
         data = json.loads(r.read().decode('utf-8'))
     rows = data.get('data', {}).get('tradesTable', {}).get('rows') or []
     if not rows:
@@ -112,4 +114,4 @@ for ticker in TICKERS:
         print(f'updated {ticker}: {len(data["chart"]["result"][0]["timestamp"])} rows')
     except Exception as e:
         print(f'FAILED {ticker}: {e}')
-    time.sleep(0.35)
+    time.sleep(0.5)
