@@ -34,3 +34,8 @@ input {
 .empty-note {
   font-size: 34px !important;
 }
+
+/* HIDE CHART / TECHNICALS STATUS LINE */
+.last-update {
+  display: none !important;
+}
