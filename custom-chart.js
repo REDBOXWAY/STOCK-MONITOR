@@ -99,7 +99,7 @@
       const LC=window.LightweightCharts;
       chartApi=LC.createChart(container,{
         autoSize:true,
-        attributionLogo:true,
+        attributionLogo:false,
         layout:{
           background:{type:LC.ColorType.Solid,color:'#050b0e'},
           textColor:'#c8d0d4',
