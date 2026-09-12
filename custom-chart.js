@@ -76,6 +76,153 @@
     if(chartApi){try{chartApi.remove()}catch(_){}chartApi=null}
   }
 
+  function addMeasureTool(container,series){
+    let enabled=false;
+    let dragging=false;
+    let start=null;
+
+    container.style.position='relative';
+
+    const button=document.createElement('button');
+    button.type='button';
+    button.textContent='MEASURE';
+    Object.assign(button.style,{
+      position:'absolute',top:'10px',right:'10px',zIndex:'20',
+      height:'32px',padding:'0 12px',border:'1px solid #3a505b',borderRadius:'7px',
+      background:'rgba(5,11,14,.92)',color:'#c8d0d4',font:'18px "Bebas Neue",sans-serif',
+      letterSpacing:'1px',cursor:'pointer'
+    });
+    container.appendChild(button);
+
+    const box=document.createElement('div');
+    Object.assign(box.style,{
+      position:'absolute',display:'none',zIndex:'15',pointerEvents:'none',
+      border:'1px solid rgba(41,98,255,.95)',background:'rgba(41,98,255,.18)'
+    });
+    container.appendChild(box);
+
+    const hLine=document.createElement('div');
+    Object.assign(hLine.style,{
+      position:'absolute',display:'none',zIndex:'16',pointerEvents:'none',height:'1px',
+      background:'#2962ff'
+    });
+    container.appendChild(hLine);
+
+    const vLine=document.createElement('div');
+    Object.assign(vLine.style,{
+      position:'absolute',display:'none',zIndex:'16',pointerEvents:'none',width:'1px',
+      background:'#2962ff'
+    });
+    container.appendChild(vLine);
+
+    const label=document.createElement('div');
+    Object.assign(label.style,{
+      position:'absolute',display:'none',zIndex:'17',pointerEvents:'none',
+      minWidth:'92px',padding:'6px 10px',borderRadius:'6px',textAlign:'center',
+      background:'#2962ff',color:'#fff',font:'22px "Bebas Neue",sans-serif',
+      letterSpacing:'1px',boxShadow:'0 2px 12px rgba(0,0,0,.35)'
+    });
+    container.appendChild(label);
+
+    function setMeasureMode(on){
+      enabled=on;
+      button.style.borderColor=on?'#00e6b3':'#3a505b';
+      button.style.color=on?'#00e6b3':'#c8d0d4';
+      button.style.background=on?'rgba(0,230,179,.08)':'rgba(5,11,14,.92)';
+      container.style.cursor=on?'crosshair':'';
+      chartApi?.applyOptions({handleScroll:{mouseWheel:true,pressedMouseMove:!on,horzTouchDrag:true,vertTouchDrag:false}});
+      if(!on){dragging=false;}
+    }
+
+    function pointFromEvent(e){
+      const r=container.getBoundingClientRect();
+      const x=Math.max(0,Math.min(r.width,e.clientX-r.left));
+      const y=Math.max(0,Math.min(r.height,e.clientY-r.top));
+      const price=series.coordinateToPrice(y);
+      return {x,y,price};
+    }
+
+    function clearMeasure(){
+      box.style.display='none';
+      hLine.style.display='none';
+      vLine.style.display='none';
+      label.style.display='none';
+    }
+
+    function drawMeasure(a,b){
+      if(!Number.isFinite(a?.price)||!Number.isFinite(b?.price)||a.price===0) return;
+      const left=Math.min(a.x,b.x), right=Math.max(a.x,b.x);
+      const top=Math.min(a.y,b.y), bottom=Math.max(a.y,b.y);
+      const pct=(b.price/a.price-1)*100;
+
+      box.style.display='block';
+      box.style.left=`${left}px`;
+      box.style.top=`${top}px`;
+      box.style.width=`${Math.max(1,right-left)}px`;
+      box.style.height=`${Math.max(1,bottom-top)}px`;
+
+      hLine.style.display='block';
+      hLine.style.left=`${left}px`;
+      hLine.style.top=`${b.y}px`;
+      hLine.style.width=`${Math.max(1,right-left)}px`;
+
+      vLine.style.display='block';
+      vLine.style.left=`${b.x}px`;
+      vLine.style.top=`${top}px`;
+      vLine.style.height=`${Math.max(1,bottom-top)}px`;
+
+      label.style.display='block';
+      label.textContent=`${pct>=0?'+':''}${pct.toFixed(2)}%`;
+      label.style.background=pct>=0?'#087f63':'#b4233a';
+      const labelX=Math.min(container.clientWidth-105,Math.max(6,(left+right)/2-46));
+      const labelY=Math.max(6,top-40);
+      label.style.left=`${labelX}px`;
+      label.style.top=`${labelY}px`;
+    }
+
+    button.addEventListener('click',e=>{
+      e.preventDefault();
+      e.stopPropagation();
+      setMeasureMode(!enabled);
+      if(!enabled) clearMeasure();
+    });
+
+    container.addEventListener('pointerdown',e=>{
+      if(!enabled||e.button!==0) return;
+      e.preventDefault();
+      e.stopPropagation();
+      clearMeasure();
+      start=pointFromEvent(e);
+      dragging=true;
+      container.setPointerCapture?.(e.pointerId);
+    },true);
+
+    container.addEventListener('pointermove',e=>{
+      if(!enabled||!dragging||!start) return;
+      e.preventDefault();
+      e.stopPropagation();
+      drawMeasure(start,pointFromEvent(e));
+    },true);
+
+    container.addEventListener('pointerup',e=>{
+      if(!enabled||!dragging||!start) return;
+      e.preventDefault();
+      e.stopPropagation();
+      drawMeasure(start,pointFromEvent(e));
+      dragging=false;
+      try{container.releasePointerCapture?.(e.pointerId)}catch(_){}
+    },true);
+
+    container.addEventListener('pointercancel',()=>{dragging=false},true);
+
+    window.addEventListener('keydown',e=>{
+      if(e.key==='Escape'&&enabled){
+        clearMeasure();
+        setMeasureMode(false);
+      }
+    },{once:false});
+  }
+
   renderChart = async function(item){
     if(!item) return;
     const token=++renderToken;
@@ -151,6 +298,7 @@
       });
       series.setData(data);
       chartApi.timeScale().fitContent();
+      addMeasureTool(container,series);
 
       resizeObserver=new ResizeObserver(()=>{
         if(chartApi) chartApi.applyOptions({width:container.clientWidth,height:container.clientHeight});
