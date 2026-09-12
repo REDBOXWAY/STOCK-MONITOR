@@ -1,0 +1,11 @@
+.search-box{overflow:visible!important;z-index:50}
+.ticker-suggestions{position:absolute;left:0;right:0;top:calc(100% + 7px);z-index:200;display:none;max-height:360px;overflow-y:auto;border:1px solid #3a505b;border-radius:10px;background:#071015;box-shadow:0 14px 32px rgba(0,0,0,.45)}
+.ticker-suggestions.open{display:block}
+.ticker-suggestion{display:grid;grid-template-columns:88px minmax(0,1fr) auto;align-items:center;gap:12px;min-height:58px;padding:8px 12px;border-bottom:1px solid rgba(127,151,161,.18);cursor:pointer}
+.ticker-suggestion:last-child{border-bottom:0}
+.ticker-suggestion:hover,.ticker-suggestion.active{background:rgba(0,230,179,.08)}
+.ticker-suggestion .ts-symbol{font-family:"Bebas Neue",sans-serif;font-size:32px;line-height:1;color:#fff;white-space:nowrap}
+.ticker-suggestion .ts-name{font-family:"Bebas Neue",sans-serif;font-size:24px;line-height:1;color:#aeb9be;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ticker-suggestion .ts-exchange{font-family:"Bebas Neue",sans-serif;font-size:22px;line-height:1;color:#00e6b3;white-space:nowrap}
+.ticker-suggestions-empty{padding:14px 12px;font-family:"Bebas Neue",sans-serif;font-size:26px;color:#92a2aa;text-align:left}
+@media(max-width:520px){.ticker-suggestion{grid-template-columns:72px minmax(0,1fr);gap:8px}.ticker-suggestion .ts-exchange{display:none}.ticker-suggestion .ts-symbol{font-size:28px}.ticker-suggestion .ts-name{font-size:20px}}
