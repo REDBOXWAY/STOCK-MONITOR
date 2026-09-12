@@ -2,13 +2,14 @@
 .watchlist .symbol-cell{gap:0!important;min-width:0!important}
 .watchlist .symbol-cell span{margin-left:0!important;padding-left:0!important}
 
-/* EVEN SPACING: TICKER / LAST / CHG / CHG% */
+/* WATCHLIST: MORE SPACE BETWEEN TICKER / PRICE / CHG / CHG% */
 .watchlist .watch-columns,
 .watchlist .watch-row{
-  grid-template-columns:repeat(4,minmax(0,1fr)) 24px!important;
+  grid-template-columns:.80fr 1.35fr .85fr 1fr 24px!important;
   column-gap:8px!important;
   padding-left:14px!important;
   padding-right:8px!important;
+  font-size:32px!important;
 }
 
 .watchlist .watch-columns>div:first-child,
@@ -31,10 +32,11 @@
 @media(max-width:520px){
   .watchlist .watch-columns,
   .watchlist .watch-row{
-    grid-template-columns:repeat(4,minmax(0,1fr)) 22px!important;
+    grid-template-columns:.80fr 1.35fr .85fr 1fr 22px!important;
     column-gap:5px!important;
     padding-left:10px!important;
     padding-right:6px!important;
+    font-size:32px!important;
   }
   .watchlist .delete-btn{width:22px!important;min-width:22px!important}
 }
