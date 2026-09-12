@@ -26,7 +26,7 @@ ETF_SYMBOLS = {'GLD'}
 def num(value):
     if value is None:
         return None
-    s = str(value).strip().replace('$', '').replace(',', '')
+    s = str(value).strip().replace('$', '').replace(',', '').replace('%', '')
     if not s or s.upper() in {'N/A', 'NA', '--'}:
         return None
     try:
@@ -44,6 +44,12 @@ def parse_date(value):
     raise ValueError(f'Unknown date format: {value}')
 
 
+def fetch_json(url, timeout=30):
+    req = urllib.request.Request(url, headers=HEADERS)
+    with urllib.request.urlopen(req, timeout=timeout) as r:
+        return json.loads(r.read().decode('utf-8'))
+
+
 def fetch_rows(ticker, assetclass):
     now = datetime.now(timezone.utc)
     # About 20 years of daily history so WEEK and MONTH calculations can use
@@ -57,13 +63,48 @@ def fetch_rows(ticker, assetclass):
     })
     symbol = urllib.parse.quote(ticker)
     url = f'https://api.nasdaq.com/api/quote/{symbol}/historical?{params}'
-    req = urllib.request.Request(url, headers=HEADERS)
-    with urllib.request.urlopen(req, timeout=45) as r:
-        data = json.loads(r.read().decode('utf-8'))
+    data = fetch_json(url, timeout=45)
     rows = data.get('data', {}).get('tradesTable', {}).get('rows') or []
     if not rows:
         raise RuntimeError('Nasdaq returned no historical rows')
     return rows
+
+
+def fetch_fundamentals(ticker, assetclass, latest_close):
+    symbol = urllib.parse.quote(ticker)
+    result = {
+        'marketCap': None,
+        'peRatio': None,
+        'epsTTM': None,
+        'source': 'NASDAQ',
+    }
+
+    try:
+        summary_url = f'https://api.nasdaq.com/api/quote/{symbol}/summary?assetclass={assetclass}'
+        summary = fetch_json(summary_url).get('data', {}).get('summaryData', {}) or {}
+        for key in ('MarketCap', 'MarketCapitalization', 'NetAssets'):
+            value = num((summary.get(key) or {}).get('value'))
+            if value is not None:
+                result['marketCap'] = value
+                break
+    except Exception as e:
+        print(f'fundamentals summary failed {ticker}: {e}')
+
+    if assetclass == 'stocks':
+        try:
+            eps_url = f'https://api.nasdaq.com/api/quote/{symbol}/eps?assetclass=stocks'
+            eps_data = fetch_json(eps_url).get('data', {}).get('earningsPerShare', []) or []
+            previous = [num(x.get('earnings')) for x in eps_data if x.get('type') == 'PreviousQuarter']
+            previous = [x for x in previous if x is not None]
+            if len(previous) >= 4:
+                eps_ttm = sum(previous[-4:])
+                result['epsTTM'] = eps_ttm
+                if eps_ttm > 0 and latest_close is not None:
+                    result['peRatio'] = latest_close / eps_ttm
+        except Exception as e:
+            print(f'fundamentals eps failed {ticker}: {e}')
+
+    return result
 
 
 def to_yahoo_shape(rows):
@@ -110,8 +151,15 @@ for ticker in TICKERS:
     try:
         rows = fetch_rows(ticker, assetclass)
         data = to_yahoo_shape(rows)
+        closes = data['chart']['result'][0]['indicators']['quote'][0]['close']
+        latest_close = closes[-1] if closes else None
+        data['fundamentals'] = fetch_fundamentals(ticker, assetclass, latest_close)
         (OUT / f'{ticker}.json').write_text(json.dumps(data, separators=(',', ':')), encoding='utf-8')
-        print(f'updated {ticker}: {len(data["chart"]["result"][0]["timestamp"])} rows')
+        f = data['fundamentals']
+        print(
+            f'updated {ticker}: {len(data["chart"]["result"][0]["timestamp"])} rows '
+            f'marketCap={f.get("marketCap")} pe={f.get("peRatio")}'
+        )
     except Exception as e:
         print(f'FAILED {ticker}: {e}')
     time.sleep(0.5)
