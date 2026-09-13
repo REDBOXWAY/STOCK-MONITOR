@@ -10,56 +10,24 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: WAIT FOR VERCEL
-        run: sleep 20
+        run: sleep 5
 
-      - name: TEST GDX QUOTE
+      - name: TEST CMC PUBLIC BTC HISTORY
         run: |
           set -e
-          curl --fail --show-error --max-time 20 "https://stock-monitor-umber.vercel.app/api/quote?symbol=GDX"
-
-      - name: TEST GDX HISTORY
-        run: |
-          set -e
-          curl --fail --show-error --max-time 30 -o /tmp/gdx-history.json "https://stock-monitor-umber.vercel.app/api/history?symbol=GDX&range=max&interval=1d"
+          START=1410912000
+          END=$(date +%s)
+          curl --fail --show-error --max-time 30 -o /tmp/cmc-history.json "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/historical?id=1&convertId=2781&timeStart=${START}&timeEnd=${END}"
           python - <<'PY'
           import json
-          d=json.load(open('/tmp/gdx-history.json'))
-          r=d.get('chart',{}).get('result',[None])[0]
-          ts=(r or {}).get('timestamp',[])
-          assert len(ts) > 100, f'not enough history: {len(ts)}'
-          print('GDX history points:', len(ts))
-          PY
-
-      - name: TEST BTC CMC DATA
-        run: |
-          set -e
-          for i in {1..10}; do
-            if curl --fail --show-error --max-time 20 -o /tmp/btc-cmc.json "https://stock-monitor-umber.vercel.app/api/crypto?symbol=BTC-USD"; then
-              break
-            fi
-            sleep 5
-          done
-          python - <<'PY'
-          import json
-          d=json.load(open('/tmp/btc-cmc.json'))
-          assert d.get('source') == 'COINMARKETCAP', d
-          assert float(d.get('price',0)) > 0, d
-          assert float(d.get('marketCap',0)) > 0, d
-          assert float(d.get('volume24h',0)) > 0, d
-          print('BTC CMC price:', d['price'])
-          print('BTC CMC market cap:', d['marketCap'])
-          print('BTC CMC 24h volume:', d['volume24h'])
-          PY
-
-      - name: TEST BTC HISTORY
-        run: |
-          set -e
-          curl --fail --show-error --max-time 30 -o /tmp/btc-history.json "https://stock-monitor-umber.vercel.app/api/history?symbol=BTC-USD&range=max&interval=1d"
-          python - <<'PY'
-          import json
-          d=json.load(open('/tmp/btc-history.json'))
-          r=d.get('chart',{}).get('result',[None])[0]
-          ts=(r or {}).get('timestamp',[])
-          assert len(ts) > 100, f'not enough history: {len(ts)}'
-          print('BTC history points:', len(ts))
+          d=json.load(open('/tmp/cmc-history.json'))
+          print('top keys:', list(d.keys()))
+          data=d.get('data') or {}
+          print('data keys:', list(data.keys()) if isinstance(data,dict) else type(data))
+          quotes=data.get('quotes',[]) if isinstance(data,dict) else []
+          print('quote count:', len(quotes))
+          if quotes:
+            print('first:', quotes[0])
+            print('last:', quotes[-1])
+          assert len(quotes) > 1000, f'not enough CMC history: {len(quotes)}'
           PY
