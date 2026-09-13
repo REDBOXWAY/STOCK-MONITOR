@@ -12,4 +12,18 @@ jobs:
       - name: TEST GDX QUOTE
         run: |
           set -e
-          curl -i --fail --show-error --max-time 20 "https://stock-monitor-umber.vercel.app/api/quote?symbol=GDX"
+          curl --fail --show-error --max-time 20 "https://stock-monitor-umber.vercel.app/api/quote?symbol=GDX"
+
+      - name: TEST GDX HISTORY
+        run: |
+          set -e
+          curl --fail --show-error --max-time 30 -o /tmp/gdx-history.json "https://stock-monitor-umber.vercel.app/api/history?symbol=GDX&range=max&interval=1d"
+          python - <<'PY'
+          import json
+          p='/tmp/gdx-history.json'
+          d=json.load(open(p))
+          r=d.get('chart',{}).get('result',[None])[0]
+          ts=(r or {}).get('timestamp',[])
+          assert len(ts) > 100, f'not enough history: {len(ts)}'
+          print('GDX history points:', len(ts))
+          PY
