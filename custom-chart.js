@@ -24,8 +24,8 @@
   }
 
   function historyConfig(range){
-    if(range==='1D') return {range:'1d',interval:'1h',intraday:true};
-    if(range==='5D') return {range:'5d',interval:'1h',intraday:true};
+    if(range==='1D') return {range:'5d',interval:'1h',intraday:true};
+    if(range==='5D') return {range:'1mo',interval:'1h',intraday:true};
     if(range==='1M') return {range:'1mo',interval:'1d',intraday:false};
     if(range==='6M') return {range:'6mo',interval:'1d',intraday:false};
     if(range==='YTD') return {range:'ytd',interval:'1d',intraday:false};
@@ -65,8 +65,12 @@
     try{return await task}catch(e){historyCache.delete(cacheKey);throw e}
   }
 
-  function rangeData(all){
-    return Array.isArray(all) ? all : [];
+  function rangeData(all,range){
+    if(!Array.isArray(all)||!all.length) return [];
+    const last=all[all.length-1].time;
+    if(range==='1D') return all.filter(x=>x.time>=last-24*60*60);
+    if(range==='5D') return all.filter(x=>x.time>=last-5*24*60*60);
+    return all;
   }
 
   function destroyChart(){
