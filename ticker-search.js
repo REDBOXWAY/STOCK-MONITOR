@@ -34,12 +34,13 @@
   }
 
   function normalizeExchange(q){
-    const raw = String(q.exchDisp || q.exchange || '').toUpperCase();
+    const raw = String(q.exchDisp || q.fullExchangeName || q.exchangeName || q.exchange || '').toUpperCase();
     if (raw.includes('NASDAQ') || ['NMS','NGM','NCM'].includes(raw)) return 'NASDAQ';
     if (raw.includes('NYSE ARCA') || raw.includes('NYSEARCA') || raw === 'PCX') return 'NYSE ARCA';
     if (raw.includes('NYSE') || raw === 'NYQ') return 'NYSE';
     if (raw.includes('AMEX') || raw === 'ASE') return 'AMEX';
-    return q.exchDisp || q.exchange || '—';
+    if (raw.includes('CBOE')) return 'CBOE';
+    return q.exchDisp || q.fullExchangeName || q.exchangeName || q.exchange || '—';
   }
 
   function tvExchange(exchange){
@@ -48,22 +49,35 @@
     if (e.includes('NYSE ARCA')) return 'AMEX';
     if (e.includes('NYSE')) return 'NYSE';
     if (e.includes('AMEX')) return 'AMEX';
+    if (e.includes('CBOE')) return 'CBOE';
     return 'NASDAQ';
+  }
+
+  function normalizeType(value){
+    const raw = String(value || '').toUpperCase();
+    if (raw === 'ETF' || raw.includes('ETF')) return 'ETF';
+    if (raw === 'EQUITY' || raw.includes('EQUITY') || raw.includes('STOCK')) return 'STOCK';
+    if (raw.includes('MUTUAL')) return 'MUTUAL FUND';
+    if (raw.includes('INDEX')) return 'INDEX';
+    if (raw.includes('CRYPTO')) return 'CRYPTO';
+    if (raw.includes('FUTURE')) return 'FUTURE';
+    if (raw.includes('CURRENCY')) return 'CURRENCY';
+    return value || '';
   }
 
   function normalizeQuote(q){
     const symbol = cleanSymbol(q.symbol);
     if (!symbol) return null;
     const exchange = normalizeExchange(q);
-    const name = q.longname || q.shortname || q.displayName || symbol;
-    const type = q.typeDisp || q.quoteType || '';
+    const name = q.longname || q.shortname || q.displayName || q.longName || q.shortName || symbol;
+    const type = normalizeType(q.typeDisp || q.quoteType || q.instrumentType || '');
     return {
       ticker: symbol,
       yahoo: symbol,
       name,
       exchange,
       type,
-      sector: q.sectorDisp || q.sector || '—',
+      sector: q.sectorDisp || q.sector || (type === 'ETF' ? 'ETF' : '—'),
       industry: q.industryDisp || q.industry || '—',
       tv: `${tvExchange(exchange)}:${symbol}`,
       domain: ''
@@ -115,6 +129,38 @@
     });
   }
 
+  async function directLookupYahoo(symbol, signal){
+    const clean = cleanSymbol(symbol);
+    if (!clean || !/^[A-Z0-9.^=\-]{1,15}$/.test(clean)) return null;
+
+    const path = `/v8/finance/chart/${encodeURIComponent(clean)}?range=1d&interval=1d&includePrePost=true&events=div%2Csplits&_=${Date.now()}`;
+    const urls = [
+      `https://query2.finance.yahoo.com${path}`,
+      `https://query1.finance.yahoo.com${path}`
+    ];
+
+    for (const url of urls){
+      try{
+        const response = await fetch(url,{cache:'no-store',signal});
+        if (!response.ok) continue;
+        const data = await response.json();
+        const meta = data?.chart?.result?.[0]?.meta;
+        if (!meta?.symbol) continue;
+        return normalizeQuote({
+          symbol: meta.symbol,
+          longName: meta.longName,
+          shortName: meta.shortName,
+          exchangeName: meta.exchangeName,
+          fullExchangeName: meta.fullExchangeName,
+          instrumentType: meta.instrumentType
+        });
+      }catch(error){
+        if (error?.name === 'AbortError') throw error;
+      }
+    }
+    return null;
+  }
+
   async function searchYahoo(query){
     const q = queryText(query);
     if (!q) return [];
@@ -124,7 +170,7 @@
     const signal = searchController.signal;
     const params = new URLSearchParams({
       q,
-      quotesCount: '12',
+      quotesCount: '50',
       newsCount: '0',
       listsCount: '0',
       enableFuzzyQuery: 'true',
@@ -136,40 +182,53 @@
       _: String(Date.now())
     });
 
+    const exact = cleanSymbol(q);
+    const exactPromise = /^[A-Z0-9.^=\-]{1,15}$/.test(exact)
+      ? directLookupYahoo(exact, signal).catch(error => {
+          if (error?.name === 'AbortError') throw error;
+          return null;
+        })
+      : Promise.resolve(null);
+
     const urls = [
       `https://query2.finance.yahoo.com/v1/finance/search?${params}`,
       `https://query1.finance.yahoo.com/v1/finance/search?${params}`
     ];
 
+    let found = [];
     let lastError = null;
     for (const url of urls){
       try{
         const response = await fetch(url,{cache:'no-store',signal});
         if (!response.ok) throw new Error(`SEARCH ${response.status}`);
         const data = await response.json();
-        const seen = new Set();
-        const items = (data?.quotes || [])
-          .map(normalizeQuote)
-          .filter(Boolean)
-          .filter(item => {
-            if (seen.has(item.ticker)) return false;
-            seen.add(item.ticker);
-            return true;
-          });
-
-        const exact = cleanSymbol(q);
-        items.sort((a,b) => {
-          const ar = a.ticker === exact ? 0 : a.ticker.startsWith(exact) ? 1 : 2;
-          const br = b.ticker === exact ? 0 : b.ticker.startsWith(exact) ? 1 : 2;
-          return ar - br || a.ticker.localeCompare(b.ticker);
-        });
-        return items.slice(0,10);
+        found = (data?.quotes || []).map(normalizeQuote).filter(Boolean);
+        break;
       }catch(error){
         if (error?.name === 'AbortError') throw error;
         lastError = error;
       }
     }
-    throw lastError || new Error('YAHOO SEARCH FAILED');
+
+    const direct = await exactPromise;
+    if (!found.length && !direct && lastError) throw lastError;
+
+    const combined = direct ? [direct, ...found] : found;
+    const seen = new Set();
+    const items = combined.filter(item => {
+      const key = `${item.ticker}|${item.exchange}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+
+    items.sort((a,b) => {
+      const ar = a.ticker === exact ? 0 : a.ticker.startsWith(exact) ? 1 : a.type === 'ETF' ? 2 : 3;
+      const br = b.ticker === exact ? 0 : b.ticker.startsWith(exact) ? 1 : b.type === 'ETF' ? 2 : 3;
+      return ar - br || a.ticker.localeCompare(b.ticker);
+    });
+
+    return items.slice(0,20);
   }
 
   async function runSearch(){
@@ -253,8 +312,11 @@
     if (!candidate){
       showMessage('VERIFYING...');
       try{
-        const items = await searchYahoo(raw);
-        candidate = items.find(x => x.ticker === raw) || null;
+        candidate = await directLookupYahoo(raw, new AbortController().signal);
+        if (!candidate){
+          const items = await searchYahoo(raw);
+          candidate = items.find(x => x.ticker === raw) || null;
+        }
       }catch(error){
         if (error?.name !== 'AbortError') console.error('YAHOO SYMBOL VERIFY FAILED',error);
       }
@@ -280,8 +342,9 @@
       tv: candidate.tv,
       name: candidate.name || candidate.ticker,
       exchange: candidate.exchange || '—',
-      sector: candidate.sector || '—',
+      sector: candidate.sector || (candidate.type === 'ETF' ? 'ETF' : '—'),
       industry: candidate.industry || '—',
+      type: candidate.type || '',
       domain: candidate.domain || '',
       last: null,
       change: null,
