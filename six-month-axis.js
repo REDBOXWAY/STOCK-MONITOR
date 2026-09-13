@@ -13,7 +13,7 @@
 
   function isCustomRange(){
     return typeof activeRange!=='undefined'&&(
-      activeRange==='6M'||activeRange==='YTD'||activeRange==='12M'||activeRange==='60M'
+      activeRange==='6M'||activeRange==='YTD'||activeRange==='12M'||activeRange==='60M'||activeRange==='120M'
     );
   }
 
@@ -27,7 +27,7 @@
     if(installed) return true;
     const LC=window.LightweightCharts;
     if(!LC||typeof LC.createChart!=='function') return false;
-    if(LC.__stockMonitorCustomCalendarAxisV5) return true;
+    if(LC.__stockMonitorCustomCalendarAxisV6) return true;
 
     const originalCreateChart=LC.createChart.bind(LC);
 
@@ -35,7 +35,7 @@
       if(!isCustomRange()) return originalCreateChart(container,options);
 
       const rangeAtCreation=activeRange;
-      const isFiveYear=rangeAtCreation==='60M';
+      const isLongRange=rangeAtCreation==='60M'||rangeAtCreation==='120M';
       container.style.position='relative';
 
       const api=originalCreateChart(container,{
@@ -158,7 +158,7 @@
 
         const visibleBars=Math.max(1,range.to-range.from);
 
-        if(isFiveYear){
+        if(isLongRange){
           const days=visibleDays(startIndex,endIndex);
           if(days>730){
             yearLabels(startIndex,endIndex);
@@ -224,11 +224,11 @@
 
     if(!applied){
       try{
-        window.LightweightCharts={...LC,createChart:wrappedCreateChart,__stockMonitorCustomCalendarAxisV5:true};
+        window.LightweightCharts={...LC,createChart:wrappedCreateChart,__stockMonitorCustomCalendarAxisV6:true};
         applied=window.LightweightCharts.createChart===wrappedCreateChart;
       }catch(_){}
     }else{
-      try{LC.__stockMonitorCustomCalendarAxisV5=true}catch(_){}
+      try{LC.__stockMonitorCustomCalendarAxisV6=true}catch(_){}
     }
 
     installed=applied;
