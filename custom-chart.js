@@ -85,7 +85,17 @@
   function rangeData(all,range){
     if(!Array.isArray(all)||!all.length) return [];
     const last=all[all.length-1].time;
-    if(range==='1D') return all.filter(x=>x.time>=last-24*60*60);
+    if(range==='1D'){
+      const rows=all.filter(x=>x.time>=last-24*60*60);
+      const hourly=[];
+      for(const row of rows){
+        const wholeHour=Math.floor(row.time/3600)*3600;
+        const prev=hourly[hourly.length-1];
+        if(prev&&prev.time===wholeHour) prev.value=row.value;
+        else hourly.push({time:wholeHour,value:row.value});
+      }
+      return hourly;
+    }
     if(range==='5D') return aggregate4H(all.filter(x=>x.time>=last-5*24*60*60));
     return all;
   }
@@ -105,12 +115,12 @@
     if(!d||Number.isNaN(d.getTime())) return '—';
 
     if(typeof activeRange!=='undefined' && activeRange==='1D'){
-      return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      return `${String(d.getUTCHours()).padStart(2,'0')}:00`;
     }
 
     const months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
     if(typeof activeRange!=='undefined' && activeRange==='5D'){
-      return `${String(d.getUTCDate()).padStart(2,'0')} ${months[d.getUTCMonth()]} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+      return `${String(d.getUTCDate()).padStart(2,'0')} ${months[d.getUTCMonth()]} · ${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`;
     }
     return `${String(d.getUTCDate()).padStart(2,'0')} ${months[d.getUTCMonth()]} '${String(d.getUTCFullYear()).slice(-2)}`;
   }
