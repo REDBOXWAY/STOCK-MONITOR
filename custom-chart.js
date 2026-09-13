@@ -144,7 +144,7 @@
     if(typeof activeRange!=='undefined' && activeRange==='5D'){
       return `${String(d.getUTCDate()).padStart(2,'0')} ${months[d.getUTCMonth()]} · ${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`;
     }
-    return `${String(d.getUTCDate()).padStart(2,'0')} ${months[d.getUTCMonth()]} '${String(d.getUTCFullYear()).slice(-2)}`;
+    return `${String(d.getUTCDate()).padStart(2,'0')} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
   }
 
   function addMeasureTool(container,series,data){
