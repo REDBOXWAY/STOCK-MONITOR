@@ -96,7 +96,12 @@
       }
       return hourly;
     }
-    if(range==='5D') return aggregate4H(all.filter(x=>x.time>=last-5*24*60*60));
+    if(range==='5D'){
+      const now=new Date();
+      const start=new Date(now.getFullYear(),now.getMonth(),now.getDate()-4,0,0,0,0).getTime()/1000;
+      const end=Date.now()/1000;
+      return aggregate4H(all.filter(x=>x.time>=start&&x.time<=end));
+    }
     return all;
   }
 
