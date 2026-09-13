@@ -27,3 +27,22 @@ jobs:
           assert len(ts) > 100, f'not enough history: {len(ts)}'
           print('GDX history points:', len(ts))
           PY
+
+      - name: TEST BTC QUOTE
+        run: |
+          set -e
+          curl --fail --show-error --max-time 20 "https://stock-monitor-umber.vercel.app/api/quote?symbol=BTC-USD"
+
+      - name: TEST BTC HISTORY
+        run: |
+          set -e
+          curl --fail --show-error --max-time 30 -o /tmp/btc-history.json "https://stock-monitor-umber.vercel.app/api/history?symbol=BTC-USD&range=max&interval=1d"
+          python - <<'PY'
+          import json
+          p='/tmp/btc-history.json'
+          d=json.load(open(p))
+          r=d.get('chart',{}).get('result',[None])[0]
+          ts=(r or {}).get('timestamp',[])
+          assert len(ts) > 100, f'not enough history: {len(ts)}'
+          print('BTC history points:', len(ts))
+          PY
