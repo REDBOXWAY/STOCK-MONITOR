@@ -41,7 +41,7 @@
       label.textContent=formatDay(t);
       Object.assign(label.style,{
         textAlign:'center',whiteSpace:'nowrap',color:'#c8d0d4',
-        font:'18px "Bebas Neue",sans-serif',letterSpacing:'.5px'
+        font:'18px "Trebuchet MS",sans-serif',letterSpacing:'.5px'
       });
       overlay.appendChild(label);
     }
