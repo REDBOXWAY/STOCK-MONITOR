@@ -27,7 +27,7 @@
     if(installed) return true;
     const LC=window.LightweightCharts;
     if(!LC||typeof LC.createChart!=='function') return false;
-    if(LC.__stockMonitorCustomCalendarAxisV6) return true;
+    if(LC.__stockMonitorCustomCalendarAxisV7) return true;
 
     const originalCreateChart=LC.createChart.bind(LC);
 
@@ -57,7 +57,8 @@
       function formatDate(row){
         const d=asDate(row?.time);
         if(!d||Number.isNaN(d.getTime())) return '';
-        return `${String(d.getUTCDate()).padStart(2,'0')} ${MONTHS[d.getUTCMonth()]}`;
+        const base=`${String(d.getUTCDate()).padStart(2,'0')} ${MONTHS[d.getUTCMonth()]}`;
+        return isLongRange?`${base} ${d.getUTCFullYear()}`:base;
       }
 
       function addLabel(text,x,stamp=null){
@@ -106,18 +107,21 @@
         for(let i=startIndex;i<=endIndex;i++){
           const d=asDate(data[i]?.time);
           if(!d) continue;
-          const key=`${d.getUTCFullYear()}-${d.getUTCMonth()}`;
+          const year=d.getUTCFullYear();
+          const key=`${year}-${d.getUTCMonth()}`;
           if(!current||current.key!==key){
-            current={key,month:d.getUTCMonth(),indices:[i]};
+            current={key,month:d.getUTCMonth(),year,indices:[i]};
             groups.push(current);
           }else current.indices.push(i);
         }
         let lastX=-Infinity;
+        const minGap=isLongRange?82:52;
         for(const g of groups){
           const idx=g.indices[Math.floor(g.indices.length/2)];
           const x=api.timeScale().timeToCoordinate(data[idx].time);
-          if(!Number.isFinite(x)||x-lastX<52) continue;
-          addLabel(MONTHS[g.month],x);
+          if(!Number.isFinite(x)||x-lastX<minGap) continue;
+          const text=isLongRange?`${MONTHS[g.month]} ${g.year}`:MONTHS[g.month];
+          addLabel(text,x);
           lastX=x;
         }
       }
@@ -128,10 +132,11 @@
         if(candidates[candidates.length-1]!==endIndex) candidates.push(endIndex);
 
         let lastX=-Infinity;
+        const minGap=isLongRange?112:62;
         for(const idx of candidates){
           const row=data[idx];
           const x=api.timeScale().timeToCoordinate(row?.time);
-          if(!Number.isFinite(x)||x-lastX<62) continue;
+          if(!Number.isFinite(x)||x-lastX<minGap) continue;
           addLabel(formatDate(row),x,dayStamp(row?.time));
           lastX=x;
         }
@@ -224,11 +229,11 @@
 
     if(!applied){
       try{
-        window.LightweightCharts={...LC,createChart:wrappedCreateChart,__stockMonitorCustomCalendarAxisV6:true};
+        window.LightweightCharts={...LC,createChart:wrappedCreateChart,__stockMonitorCustomCalendarAxisV7:true};
         applied=window.LightweightCharts.createChart===wrappedCreateChart;
       }catch(_){}
     }else{
-      try{LC.__stockMonitorCustomCalendarAxisV6=true}catch(_){}
+      try{LC.__stockMonitorCustomCalendarAxisV7=true}catch(_){}
     }
 
     installed=applied;
