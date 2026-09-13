@@ -10,6 +10,33 @@
     return Number.isFinite(n) ? n : null;
   }
 
+  function isCrypto(item){
+    const type = String(item?.type || '').toUpperCase();
+    const symbol = String(item?.yahoo || item?.ticker || '').toUpperCase();
+    return type === 'CRYPTO' || symbol === 'BTC-USD' || symbol === 'ETH-USD';
+  }
+
+  async function fetchCryptoQuote(item){
+    const symbol = encodeURIComponent(item.yahoo || item.ticker);
+    const response = await fetch(`${PROXY_BASE}/api/crypto?symbol=${symbol}&_=${Date.now()}`, {
+      cache:'no-store',
+      mode:'cors'
+    });
+    if(!response.ok) throw new Error(`CMC ${response.status}`);
+    const data = await response.json();
+    const price = finite(data.price);
+    const pct = finite(data.pct24h);
+    if(price == null) throw new Error('CMC NO PRICE');
+
+    let change = null;
+    if(pct != null && pct > -100){
+      const previous = price / (1 + pct / 100);
+      if(Number.isFinite(previous)) change = price - previous;
+    }
+
+    return { price, change, pct, source:'COINMARKETCAP' };
+  }
+
   async function fetchProxyQuote(item){
     const symbol = encodeURIComponent(item.yahoo || item.ticker);
     const response = await fetch(`${PROXY_BASE}/api/quote?symbol=${symbol}&_=${Date.now()}`, {
@@ -20,7 +47,7 @@
     const data = await response.json();
     const price = finite(data.price);
     if(price == null) throw new Error('PROXY NO PRICE');
-    return { price, change:finite(data.change), pct:finite(data.pct) };
+    return { price, change:finite(data.change), pct:finite(data.pct), source:data.source || 'YAHOO_VIA_VERCEL' };
   }
 
   async function fetchDirectYahoo(item){
@@ -47,7 +74,7 @@
         if(price == null) throw new Error('NO PRICE');
         const change = prev != null ? price-prev : null;
         const pct = prev != null && prev !== 0 ? change/prev*100 : null;
-        return {price,change,pct};
+        return {price,change,pct,source:'YAHOO_DIRECT'};
       }catch(error){
         lastError = error;
       }
@@ -56,6 +83,22 @@
   }
 
   async function fetchLiveQuote(item){
+    if(isCrypto(item)){
+      try{
+        return await fetchCryptoQuote(item);
+      }catch(cmcError){
+        try{
+          return await fetchProxyQuote(item);
+        }catch(proxyError){
+          try{
+            return await fetchDirectYahoo(item);
+          }catch(_){
+            throw cmcError || proxyError;
+          }
+        }
+      }
+    }
+
     try{
       return await fetchProxyQuote(item);
     }catch(proxyError){
@@ -84,6 +127,7 @@
         item.last = q.price;
         if(Number.isFinite(q.change)) item.change = q.change;
         if(Number.isFinite(q.pct)) item.pct = q.pct;
+        item.quoteSource = q.source || '';
         changed = true;
       });
 
