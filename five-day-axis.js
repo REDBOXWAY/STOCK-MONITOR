@@ -8,6 +8,10 @@
     document.getElementById('fiveDayAxisOverlay')?.remove();
   }
 
+  function removeOneMonthAxis(){
+    document.getElementById('oneMonthAxisOverlay')?.remove();
+  }
+
   function removeOneDayAxis(){
     document.getElementById('oneDayLocalAxisOverlay')?.remove();
     if(oneDayClockTimer){
@@ -38,6 +42,51 @@
 
     const overlay=document.createElement('div');
     overlay.id='fiveDayAxisOverlay';
+    Object.assign(overlay.style,{
+      position:'absolute',left:'0',right:'0',bottom:'0',height:'36px',zIndex:'30',
+      display:'grid',gridTemplateColumns:`repeat(${days.length},1fr)`,alignItems:'center',
+      background:'#050b0e',borderTop:'1px solid #33444c',pointerEvents:'none',
+      padding:'0 18px',boxSizing:'border-box'
+    });
+
+    for(const t of days){
+      const label=document.createElement('div');
+      label.textContent=formatDay(t);
+      Object.assign(label.style,{
+        textAlign:'center',whiteSpace:'nowrap',color:'#c8d0d4',
+        font:'18px "Trebuchet MS",sans-serif',fontWeight:'700'
+      });
+      overlay.appendChild(label);
+    }
+    host.appendChild(overlay);
+  }
+
+  function getOneMonthLabels(){
+    const now=new Date();
+    const end=new Date(now.getFullYear(),now.getMonth(),now.getDate());
+    const start=new Date(end);
+    start.setMonth(start.getMonth()-1);
+
+    const labels=[];
+    const cursor=new Date(start);
+    while(cursor<=end){
+      labels.push(Date.UTC(cursor.getFullYear(),cursor.getMonth(),cursor.getDate())/1000);
+      cursor.setDate(cursor.getDate()+3);
+    }
+
+    const endUtc=Date.UTC(end.getFullYear(),end.getMonth(),end.getDate())/1000;
+    if(labels[labels.length-1]!==endUtc) labels.push(endUtc);
+    return labels;
+  }
+
+  function drawOneMonthAxis(days){
+    removeOneMonthAxis();
+    const host=document.getElementById('chartHost');
+    if(!host||!days.length) return;
+    host.style.position='relative';
+
+    const overlay=document.createElement('div');
+    overlay.id='oneMonthAxisOverlay';
     Object.assign(overlay.style,{
       position:'absolute',left:'0',right:'0',bottom:'0',height:'36px',zIndex:'30',
       display:'grid',gridTemplateColumns:`repeat(${days.length},1fr)`,alignItems:'center',
@@ -118,12 +167,18 @@
   renderChart=async function(item){
     const token=++axisToken;
     removeFiveDayAxis();
+    removeOneMonthAxis();
     removeOneDayAxis();
     await originalRenderChart(item);
     if(token!==axisToken) return;
 
     if(activeRange==='5D'){
       drawFiveDayAxis(getFiveCalendarDays());
+      return;
+    }
+
+    if(activeRange==='1M'){
+      drawOneMonthAxis(getOneMonthLabels());
       return;
     }
 
