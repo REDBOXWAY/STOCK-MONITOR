@@ -23,19 +23,28 @@
     });
   }
 
+  function historyConfig(range){
+    if(range==='1D') return {range:'1d',interval:'1h',intraday:true};
+    if(range==='5D') return {range:'5d',interval:'1h',intraday:true};
+    if(range==='1M') return {range:'1mo',interval:'1d',intraday:false};
+    if(range==='6M') return {range:'6mo',interval:'1d',intraday:false};
+    if(range==='YTD') return {range:'ytd',interval:'1d',intraday:false};
+    if(range==='12M') return {range:'1y',interval:'1d',intraday:false};
+    if(range==='60M') return {range:'5y',interval:'1wk',intraday:false};
+    if(range==='120M') return {range:'10y',interval:'1wk',intraday:false};
+    return {range:'max',interval:'1mo',intraday:false};
+  }
+
   async function fetchHistory(item, range){
     const key=item.yahoo||item.ticker;
-    const intraday=range==='1D';
-    const cacheKey=`${key}|${intraday?'1d-1h':'max-1d'}`;
+    const cfg=historyConfig(range);
+    const cacheKey=`${key}|${cfg.range}|${cfg.interval}`;
     if(historyCache.has(cacheKey)) return historyCache.get(cacheKey);
 
     const task=(async()=>{
       const symbol=encodeURIComponent(key);
-      const url=intraday
-        ? `${VERCEL_PROXY}/api/history?symbol=${symbol}&range=1d&interval=1h&_=${Date.now()}`
-        : `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=max&interval=1d&includePrePost=false&events=div%2Csplits`;
-
-      const r=await fetch(url,{cache:'no-store',mode:intraday?'cors':undefined});
+      const url=`${VERCEL_PROXY}/api/history?symbol=${symbol}&range=${encodeURIComponent(cfg.range)}&interval=${encodeURIComponent(cfg.interval)}&_=${Date.now()}`;
+      const r=await fetch(url,{cache:'no-store',mode:'cors'});
       if(!r.ok) throw new Error(`MARKET DATA ${r.status}`);
       const d=await r.json();
       const res=d?.chart?.result?.[0];
@@ -56,29 +65,8 @@
     try{return await task}catch(e){historyCache.delete(cacheKey);throw e}
   }
 
-  function subtractYears(ts,years){
-    const d=new Date(ts*1000);
-    d.setUTCFullYear(d.getUTCFullYear()-years);
-    return Math.floor(d.getTime()/1000);
-  }
-
-  function rangeData(all,range){
-    if(!all.length) return all;
-    const last=all[all.length-1].time;
-    if(range==='ALL') return all;
-    if(range==='1D') return all;
-    if(range==='5D') return all.slice(-6);
-    if(range==='1M') return all.slice(-23);
-    if(range==='6M') return all.slice(-132);
-    if(range==='12M') return all.filter(x=>x.time>=subtractYears(last,1));
-    if(range==='60M') return all.filter(x=>x.time>=subtractYears(last,5));
-    if(range==='120M') return all.filter(x=>x.time>=subtractYears(last,10));
-    if(range==='YTD'){
-      const y=new Date(last*1000).getUTCFullYear();
-      const start=Date.UTC(y,0,1)/1000;
-      return all.filter(x=>x.time>=start);
-    }
-    return all;
+  function rangeData(all){
+    return Array.isArray(all) ? all : [];
   }
 
   function destroyChart(){
@@ -100,6 +88,9 @@
     }
 
     const months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    if(typeof activeRange!=='undefined' && activeRange==='5D'){
+      return `${String(d.getUTCDate()).padStart(2,'0')} ${months[d.getUTCMonth()]} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
     return `${String(d.getUTCDate()).padStart(2,'0')} ${months[d.getUTCMonth()]} '${String(d.getUTCFullYear()).slice(-2)}`;
   }
 
@@ -326,7 +317,7 @@
       host.appendChild(container);
 
       const LC=window.LightweightCharts;
-      const intraday=activeRange==='1D';
+      const intraday=activeRange==='1D'||activeRange==='5D';
 
       chartApi=LC.createChart(container,{
         autoSize:true,
@@ -353,8 +344,8 @@
           timeVisible:intraday,
           secondsVisible:false,
           rightOffset:2,
-          barSpacing:intraday?28:7,
-          minBarSpacing:intraday?12:2,
+          barSpacing:activeRange==='1D'?28:activeRange==='5D'?8:7,
+          minBarSpacing:activeRange==='1D'?12:activeRange==='5D'?3:2,
           fixLeftEdge:true,
           fixRightEdge:true
         },
