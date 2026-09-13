@@ -1,5 +1,19 @@
 (() => {
+  const previousRenderMetrics = window.renderMetricsFromCandles;
   const cache = new Map();
+
+  function normalizedSymbol(item) {
+    return String(item?.yahoo || item?.ticker || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g, '');
+  }
+
+  function isCryptoItem(item) {
+    const type = String(item?.type || '').toUpperCase();
+    const symbol = normalizedSymbol(item);
+    return type === 'CRYPTO' || symbol === 'BTCUSD' || symbol === 'ETHUSD';
+  }
 
   async function loadFundamentals(ticker) {
     if (!ticker) return null;
@@ -27,11 +41,19 @@
   window.renderMetricsFromCandles = function(candles) {
     if (!candles?.length) return;
 
+    const current = typeof selected === 'function' ? selected() : null;
+
+    // Crypto metrics (BTCUSD / ETHUSD) must stay on the CoinMarketCap renderer
+    // defined by compact-numbers.js. Do not overwrite MARKET CAP / VOLUME 24H.
+    if (isCryptoItem(current) && typeof previousRenderMetrics === 'function') {
+      return previousRenderMetrics(candles);
+    }
+
     const last = candles[candles.length - 1];
     const last252 = candles.slice(-252);
     const high52 = Math.max(...last252.map(x => x.high));
     const low52 = Math.min(...last252.map(x => x.low));
-    const ticker = typeof selected === 'function' ? selected()?.ticker : null;
+    const ticker = current?.ticker || null;
 
     const paint = fundamentals => {
       const marketCap = Number(fundamentals?.marketCap);
