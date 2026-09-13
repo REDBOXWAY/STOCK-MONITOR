@@ -25,10 +25,17 @@
     return Number.isFinite(n) && n > 0 ? n.toFixed(1) : '—';
   }
 
+  function normalizedCryptoSymbol(item){
+    return String(item?.yahoo || item?.ticker || '')
+      .trim()
+      .toUpperCase()
+      .replace(/[^A-Z0-9]/g,'');
+  }
+
   function isCryptoItem(item){
     const type = String(item?.type || '').toUpperCase();
-    const symbol = String(item?.yahoo || item?.ticker || '').toUpperCase();
-    return type === 'CRYPTO' || symbol === 'BTC-USD' || symbol === 'ETH-USD';
+    const symbol = normalizedCryptoSymbol(item);
+    return type === 'CRYPTO' || symbol === 'BTCUSD' || symbol === 'ETHUSD';
   }
 
   const fundamentalsCache = new Map();
@@ -56,7 +63,8 @@
   }
 
   async function loadCryptoMetrics(item){
-    const symbol = String(item?.yahoo || item?.ticker || '').toUpperCase();
+    const displaySymbol = normalizedCryptoSymbol(item);
+    const symbol = displaySymbol === 'BTCUSD' ? 'BTCUSD' : displaySymbol === 'ETHUSD' ? 'ETHUSD' : String(item?.yahoo || item?.ticker || '').toUpperCase();
     if (!symbol) return null;
 
     const cached = cryptoCache.get(symbol);
@@ -86,7 +94,7 @@
     const crypto = isCryptoItem(current);
 
     const render = (extra = null) => {
-      const marketCap = crypto ? extra?.marketCap : extra?.marketCap;
+      const marketCap = extra?.marketCap;
       const peRatio = crypto ? null : extra?.peRatio;
       const volume = crypto && Number.isFinite(Number(extra?.volume24h)) ? extra.volume24h : last.volume;
       const values = [
