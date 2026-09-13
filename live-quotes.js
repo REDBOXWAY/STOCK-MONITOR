@@ -1,5 +1,7 @@
 (() => {
   const REFRESH_MS = 5000;
+  const VERCEL_PROXY = 'https://stock-monitor-umber.vercel.app';
+  const PROXY_BASE = location.hostname.endsWith('.vercel.app') ? '' : VERCEL_PROXY;
   let busy = false;
   let timer = null;
 
@@ -10,7 +12,10 @@
 
   async function fetchProxyQuote(item){
     const symbol = encodeURIComponent(item.yahoo || item.ticker);
-    const response = await fetch(`/api/quote?symbol=${symbol}&_=${Date.now()}`, { cache:'no-store' });
+    const response = await fetch(`${PROXY_BASE}/api/quote?symbol=${symbol}&_=${Date.now()}`, {
+      cache:'no-store',
+      mode:'cors'
+    });
     if(!response.ok) throw new Error(`PROXY ${response.status}`);
     const data = await response.json();
     const price = finite(data.price);
@@ -31,14 +36,21 @@
         const meta = result.meta || {};
         const closes = result?.indicators?.quote?.[0]?.close || [];
         let last = null;
-        for(let i=closes.length-1;i>=0;i--){ if(Number.isFinite(closes[i])){ last = closes[i]; break; } }
+        for(let i=closes.length-1;i>=0;i--){
+          if(Number.isFinite(closes[i])){
+            last = closes[i];
+            break;
+          }
+        }
         const price = finite(meta.regularMarketPrice) ?? finite(last);
         const prev = finite(meta.chartPreviousClose) ?? finite(meta.previousClose);
         if(price == null) throw new Error('NO PRICE');
         const change = prev != null ? price-prev : null;
         const pct = prev != null && prev !== 0 ? change/prev*100 : null;
         return {price,change,pct};
-      }catch(error){ lastError = error; }
+      }catch(error){
+        lastError = error;
+      }
     }
     throw lastError || new Error('DIRECT QUOTE FAILED');
   }
@@ -47,7 +59,11 @@
     try{
       return await fetchProxyQuote(item);
     }catch(proxyError){
-      return await fetchDirectYahoo(item);
+      try{
+        return await fetchDirectYahoo(item);
+      }catch(directError){
+        throw proxyError || directError;
+      }
     }
   }
 
