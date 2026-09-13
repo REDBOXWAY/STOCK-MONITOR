@@ -9,6 +9,9 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      - name: WAIT FOR VERCEL
+        run: sleep 20
+
       - name: TEST GDX QUOTE
         run: |
           set -e
@@ -20,18 +23,33 @@ jobs:
           curl --fail --show-error --max-time 30 -o /tmp/gdx-history.json "https://stock-monitor-umber.vercel.app/api/history?symbol=GDX&range=max&interval=1d"
           python - <<'PY'
           import json
-          p='/tmp/gdx-history.json'
-          d=json.load(open(p))
+          d=json.load(open('/tmp/gdx-history.json'))
           r=d.get('chart',{}).get('result',[None])[0]
           ts=(r or {}).get('timestamp',[])
           assert len(ts) > 100, f'not enough history: {len(ts)}'
           print('GDX history points:', len(ts))
           PY
 
-      - name: TEST BTC QUOTE
+      - name: TEST BTC CMC DATA
         run: |
           set -e
-          curl --fail --show-error --max-time 20 "https://stock-monitor-umber.vercel.app/api/quote?symbol=BTC-USD"
+          for i in {1..10}; do
+            if curl --fail --show-error --max-time 20 -o /tmp/btc-cmc.json "https://stock-monitor-umber.vercel.app/api/crypto?symbol=BTC-USD"; then
+              break
+            fi
+            sleep 5
+          done
+          python - <<'PY'
+          import json
+          d=json.load(open('/tmp/btc-cmc.json'))
+          assert d.get('source') == 'COINMARKETCAP', d
+          assert float(d.get('price',0)) > 0, d
+          assert float(d.get('marketCap',0)) > 0, d
+          assert float(d.get('volume24h',0)) > 0, d
+          print('BTC CMC price:', d['price'])
+          print('BTC CMC market cap:', d['marketCap'])
+          print('BTC CMC 24h volume:', d['volume24h'])
+          PY
 
       - name: TEST BTC HISTORY
         run: |
@@ -39,8 +57,7 @@ jobs:
           curl --fail --show-error --max-time 30 -o /tmp/btc-history.json "https://stock-monitor-umber.vercel.app/api/history?symbol=BTC-USD&range=max&interval=1d"
           python - <<'PY'
           import json
-          p='/tmp/btc-history.json'
-          d=json.load(open(p))
+          d=json.load(open('/tmp/btc-history.json'))
           r=d.get('chart',{}).get('result',[None])[0]
           ts=(r or {}).get('timestamp',[])
           assert len(ts) > 100, f'not enough history: {len(ts)}'
