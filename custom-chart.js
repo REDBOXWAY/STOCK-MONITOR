@@ -132,6 +132,17 @@
     return `${String(d.getUTCDate()).padStart(2,'0')} ${months[d.getUTCMonth()]}`;
   }
 
+  function crosshairTimeText(time){
+    const d=timeToDate(time);
+    if(!d||Number.isNaN(d.getTime())) return '';
+    const months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    const date=`${String(d.getUTCDate()).padStart(2,'0')} ${months[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+    if(typeof activeRange!=='undefined'&&(activeRange==='1D'||activeRange==='5D')){
+      return `${date} · ${String(d.getUTCHours()).padStart(2,'0')}:${String(d.getUTCMinutes()).padStart(2,'0')}`;
+    }
+    return date;
+  }
+
   function measureDateText(time){
     const d=timeToDate(time);
     if(!d||Number.isNaN(d.getTime())) return '—';
@@ -374,6 +385,9 @@
 
       chartApi=LC.createChart(container,{
         autoSize:true,
+        localization:{
+          timeFormatter:(time)=>crosshairTimeText(time)
+        },
         layout:{
           background:{type:LC.ColorType.Solid,color:'#050b0e'},
           textColor:'#c8d0d4',
