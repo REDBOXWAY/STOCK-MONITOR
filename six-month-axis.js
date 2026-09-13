@@ -12,7 +12,7 @@
   }
 
   function isCalendarRange(){
-    return typeof activeRange!=='undefined'&&(activeRange==='6M'||activeRange==='YTD');
+    return typeof activeRange!=='undefined'&&(activeRange==='6M'||activeRange==='YTD'||activeRange==='12M');
   }
 
   function install(){
