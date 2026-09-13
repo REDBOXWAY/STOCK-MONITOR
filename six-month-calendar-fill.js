@@ -2,9 +2,14 @@
   const MONTHS=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
   let timer=null;
 
+  function isLongRange(){
+    return typeof activeRange!=='undefined'&&(activeRange==='60M'||activeRange==='120M');
+  }
+
   function textFromStamp(s){
     const d=new Date(s*86400000);
-    return `${String(d.getUTCDate()).padStart(2,'0')} ${MONTHS[d.getUTCMonth()]}`;
+    const base=`${String(d.getUTCDate()).padStart(2,'0')} ${MONTHS[d.getUTCMonth()]}`;
+    return isLongRange()?`${base} ${d.getUTCFullYear()}`:base;
   }
 
   function supportedRange(){
@@ -35,7 +40,8 @@
         if(!Number.isFinite(sa)||!Number.isFinite(sb)||!Number.isFinite(xa)||!Number.isFinite(xb)||gap<=1) continue;
 
         const pixelsPerDay=(xb-xa)/gap;
-        if(pixelsPerDay<62) continue;
+        const minPixels=isLongRange()?112:62;
+        if(pixelsPerDay<minPixels) continue;
 
         for(let n=1;n<gap;n++){
           const stamp=sa+n;
