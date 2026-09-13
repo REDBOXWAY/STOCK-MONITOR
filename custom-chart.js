@@ -355,6 +355,7 @@
         layout:{
           background:{type:LC.ColorType.Solid,color:'#050b0e'},
           textColor:'#c8d0d4',
+          fontFamily:'Trebuchet MS',
           fontSize:18,
           attributionLogo:false
         },
