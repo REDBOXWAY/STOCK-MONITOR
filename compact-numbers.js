@@ -1,4 +1,7 @@
 (() => {
+  const VERCEL_PROXY = 'https://stock-monitor-umber.vercel.app';
+  const PROXY_BASE = location.hostname.endsWith('.vercel.app') ? '' : VERCEL_PROXY;
+
   function compactNumber(value) {
     const n = Number(value);
     if (!Number.isFinite(n)) return '—';
@@ -22,7 +25,14 @@
     return Number.isFinite(n) && n > 0 ? n.toFixed(1) : '—';
   }
 
+  function isCryptoItem(item){
+    const type = String(item?.type || '').toUpperCase();
+    const symbol = String(item?.yahoo || item?.ticker || '').toUpperCase();
+    return type === 'CRYPTO' || symbol === 'BTC-USD' || symbol === 'ETH-USD';
+  }
+
   const fundamentalsCache = new Map();
+  const cryptoCache = new Map();
 
   async function loadFundamentals(ticker) {
     if (!ticker) return null;
@@ -45,6 +55,23 @@
     }
   }
 
+  async function loadCryptoMetrics(item){
+    const symbol = String(item?.yahoo || item?.ticker || '').toUpperCase();
+    if (!symbol) return null;
+
+    const cached = cryptoCache.get(symbol);
+    if (cached && Date.now() - cached.time < 55000) return cached.data;
+
+    const response = await fetch(`${PROXY_BASE}/api/crypto?symbol=${encodeURIComponent(symbol)}&_=${Date.now()}`, {
+      cache:'no-store',
+      mode:'cors'
+    });
+    if (!response.ok) throw new Error(`CRYPTO METRICS ${response.status}`);
+    const data = await response.json();
+    cryptoCache.set(symbol,{time:Date.now(),data});
+    return data;
+  }
+
   window.compactNumber = compactNumber;
 
   window.renderMetricsFromCandles = function(candles) {
@@ -54,16 +81,19 @@
     const last252 = candles.slice(-252);
     const high52 = Math.max(...last252.map(x => x.high));
     const low52 = Math.min(...last252.map(x => x.low));
-    const ticker = typeof selected === 'function' ? selected()?.ticker : null;
+    const current = typeof selected === 'function' ? selected() : null;
+    const ticker = current?.ticker || null;
+    const crypto = isCryptoItem(current);
 
-    const render = (fundamentals = null) => {
-      const marketCap = fundamentals?.marketCap;
-      const peRatio = fundamentals?.peRatio;
+    const render = (extra = null) => {
+      const marketCap = crypto ? extra?.marketCap : extra?.marketCap;
+      const peRatio = crypto ? null : extra?.peRatio;
+      const volume = crypto && Number.isFinite(Number(extra?.volume24h)) ? extra.volume24h : last.volume;
       const values = [
         ['OPEN', fmtPrice(last.open)],
         ['HIGH', fmtPrice(last.high)],
         ['LOW', fmtPrice(last.low)],
-        ['VOLUME', compactNumber(last.volume)],
+        [crypto ? 'VOLUME 24H' : 'VOLUME', compactNumber(volume)],
         ['MARKET CAP', Number.isFinite(Number(marketCap)) ? compactNumber(marketCap) : '—'],
         ['P/E', formatPE(peRatio)],
         ['52W HIGH', fmtPrice(high52)],
@@ -77,13 +107,23 @@
 
     render();
 
-    if (ticker) {
-      loadFundamentals(ticker)
-        .then(fundamentals => {
+    if (!ticker) return;
+
+    if (crypto) {
+      loadCryptoMetrics(current)
+        .then(data => {
           if (typeof selected === 'function' && selected()?.ticker !== ticker) return;
-          render(fundamentals);
+          render(data);
         })
-        .catch(err => console.error('FUNDAMENTALS UNAVAILABLE', err));
+        .catch(err => console.error('COINMARKETCAP METRICS UNAVAILABLE', err));
+      return;
     }
+
+    loadFundamentals(ticker)
+      .then(fundamentals => {
+        if (typeof selected === 'function' && selected()?.ticker !== ticker) return;
+        render(fundamentals);
+      })
+      .catch(err => console.error('FUNDAMENTALS UNAVAILABLE', err));
   };
 })();
