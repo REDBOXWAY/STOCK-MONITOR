@@ -16,9 +16,29 @@ jobs:
           import json, subprocess
 
           base='https://stock-monitor-umber.vercel.app/api/history?symbol=BTC-USD'
+
+          def get(rg,it):
+            url=f'{base}&range={rg}&interval={it}'
+            raw=subprocess.check_output(['curl','--fail','--show-error','--max-time','40','-sS',url])
+            d=json.loads(raw)
+            r=(d.get('chart') or {}).get('result',[None])[0] or {}
+            ts=r.get('timestamp') or []
+            assert len(ts)>1, (rg,it,len(ts))
+            return ts
+
+          ts=get('5d','1h')
+          last=ts[-1]
+          d1=[t for t in ts if t>=last-24*3600]
+          assert len(d1)>=20, ('1D rolling points',len(d1))
+          print(f'1D: {len(d1)} hourly points, rolling 24h')
+
+          ts=get('1mo','1h')
+          last=ts[-1]
+          d5=[t for t in ts if t>=last-5*24*3600]
+          assert len(d5)>=100, ('5D rolling points',len(d5))
+          print(f'5D: {len(d5)} hourly points, rolling 5 days')
+
           tests=[
-            ('1D','1d','1h',10,0.4),
-            ('5D','5d','1h',50,4),
             ('1M','1mo','1d',20,25),
             ('6M','6mo','1d',150,160),
             ('YTD','ytd','1d',150,150),
@@ -28,13 +48,9 @@ jobs:
           ]
 
           for label,rg,it,min_points,min_days in tests:
-            url=f'{base}&range={rg}&interval={it}'
-            raw=subprocess.check_output(['curl','--fail','--show-error','--max-time','40','-sS',url])
-            d=json.loads(raw)
-            r=(d.get('chart') or {}).get('result',[None])[0] or {}
-            ts=r.get('timestamp') or []
+            ts=get(rg,it)
+            span=(ts[-1]-ts[0])/86400
             assert len(ts)>=min_points, (label,'points',len(ts))
-            span=(ts[-1]-ts[0])/86400 if len(ts)>1 else 0
             assert span>=min_days, (label,'span',span)
             print(f'{label}: {len(ts)} points, {span:.1f} days, {it}')
           PY
