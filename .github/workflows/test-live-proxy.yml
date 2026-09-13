@@ -9,19 +9,32 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: WAIT FOR VERCEL
-        run: sleep 25
-
-      - name: TEST BTC PERFORMANCE
+      - name: TEST BTC CHART RANGES
         run: |
           set -e
-          curl --fail --show-error --max-time 40 -o /tmp/perf.json "https://stock-monitor-umber.vercel.app/api/crypto-performance?symbol=BTCUSD"
           python - <<'PY'
-          import json
-          d=json.load(open('/tmp/perf.json'))
-          print(json.dumps(d, indent=2))
-          assert d.get('source') == 'COINMARKETCAP', d
-          v=d.get('values') or {}
-          for k in ['day1','day5','month1','month6','ytd','year1','year5','year10','all']:
-            assert v.get(k) is not None, (k,d)
+          import json, subprocess
+
+          base='https://stock-monitor-umber.vercel.app/api/history?symbol=BTC-USD'
+          tests=[
+            ('1D','1d','1h',10,0.4),
+            ('5D','5d','1h',50,4),
+            ('1M','1mo','1d',20,25),
+            ('6M','6mo','1d',150,160),
+            ('YTD','ytd','1d',150,150),
+            ('1Y','1y','1d',300,330),
+            ('5Y','5y','1wk',200,1600),
+            ('10Y','10y','1wk',400,3200),
+          ]
+
+          for label,rg,it,min_points,min_days in tests:
+            url=f'{base}&range={rg}&interval={it}'
+            raw=subprocess.check_output(['curl','--fail','--show-error','--max-time','40','-sS',url])
+            d=json.loads(raw)
+            r=(d.get('chart') or {}).get('result',[None])[0] or {}
+            ts=r.get('timestamp') or []
+            assert len(ts)>=min_points, (label,'points',len(ts))
+            span=(ts[-1]-ts[0])/86400 if len(ts)>1 else 0
+            assert span>=min_days, (label,'span',span)
+            print(f'{label}: {len(ts)} points, {span:.1f} days, {it}')
           PY
