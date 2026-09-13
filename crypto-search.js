@@ -8,8 +8,19 @@
     { ticker:'ETH-USD', name:'Ethereum USD', exchange:'CRYPTO', type:'CRYPTO' }
   ];
 
+  const ALIASES = {
+    'BTC':'BTC-USD',
+    'BTCUSD':'BTC-USD',
+    'BTC-USD':'BTC-USD',
+    'BITCOIN':'BTC-USD',
+    'ETH':'ETH-USD',
+    'ETHUSD':'ETH-USD',
+    'ETH-USD':'ETH-USD',
+    'ETHEREUM':'ETH-USD'
+  };
+
   function esc(value){
-    return String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+    return String(value ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\"/g,'&quot;').replace(/'/g,'&#39;');
   }
 
   function matches(item, query){
@@ -51,9 +62,60 @@
     dropdown.classList.add('open');
   }
 
+  function repairCryptoWatchlist(){
+    if (typeof watchlist === 'undefined' || !Array.isArray(watchlist)) return;
+    let changed = false;
+
+    watchlist.forEach(item => {
+      const tickerKey = String(item?.ticker || '').toUpperCase().replace(/[^A-Z0-9-]/g,'');
+      const yahooKey = String(item?.yahoo || '').toUpperCase().replace(/[^A-Z0-9-]/g,'');
+      const yahoo = ALIASES[tickerKey] || ALIASES[yahooKey];
+      if (!yahoo) return;
+
+      const isBTC = yahoo === 'BTC-USD';
+      const desired = {
+        yahoo,
+        name:isBTC ? 'Bitcoin USD' : 'Ethereum USD',
+        exchange:'CRYPTO',
+        type:'CRYPTO',
+        sector:'CRYPTO',
+        industry:'CRYPTO',
+        tv:isBTC ? 'BITSTAMP:BTCUSD' : 'COINBASE:ETHUSD'
+      };
+
+      Object.entries(desired).forEach(([key,value]) => {
+        if (item[key] !== value) {
+          item[key] = value;
+          changed = true;
+        }
+      });
+    });
+
+    if (!changed) return;
+
+    try { persist(); } catch (_) {}
+    setTimeout(() => {
+      try { renderAll(); } catch (_) {}
+      try { window.refreshLiveQuotesNow?.(); } catch (_) {}
+    }, 0);
+  }
+
   input.addEventListener('input', () => {
     setTimeout(injectCryptoResults, 30);
     setTimeout(injectCryptoResults, 250);
   });
   input.addEventListener('focus', () => setTimeout(injectCryptoResults, 30));
+
+  const rows = document.getElementById('watchRows');
+  if (rows && window.MutationObserver) {
+    new MutationObserver(() => setTimeout(repairCryptoWatchlist, 0)).observe(rows, { childList:true });
+  }
+
+  repairCryptoWatchlist();
+  window.addEventListener('load', () => {
+    repairCryptoWatchlist();
+    setTimeout(() => {
+      try { window.refreshLiveQuotesNow?.(); } catch (_) {}
+    }, 200);
+  }, { once:true });
 })();
