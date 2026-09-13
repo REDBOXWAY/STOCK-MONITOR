@@ -62,6 +62,10 @@
   white-space:nowrap!important;
 }
 
+.quote-price small{
+  font-size:32px!important;
+}
+
 .quote-change{
   margin:0!important;
   white-space:nowrap!important;
