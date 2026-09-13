@@ -285,7 +285,7 @@
 
       const series=chartApi.addSeries(LC.AreaSeries,{
         lineColor:'#2962ff',
-        lineWidth:2,
+        lineWidth:4,
         topColor:'rgba(41,98,255,.28)',
         bottomColor:'rgba(41,98,255,.02)',
         priceLineVisible:true,
