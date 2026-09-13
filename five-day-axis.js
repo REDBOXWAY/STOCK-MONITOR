@@ -21,11 +21,13 @@
     return `${String(d.getUTCDate()).padStart(2,'0')} ${MONTHS[d.getUTCMonth()]}`;
   }
 
+  // 5D includes today plus the previous four calendar days.
+  // Example on 13 Sep: 09 SEP · 10 SEP · 11 SEP · 12 SEP · 13 SEP.
   function getFiveCalendarDays(){
     const now=new Date();
     const todayUtc=Date.UTC(now.getFullYear(),now.getMonth(),now.getDate())/1000;
     const day=24*60*60;
-    return [5,4,3,2,1].map(n=>todayUtc-n*day);
+    return [4,3,2,1,0].map(n=>todayUtc-n*day);
   }
 
   function drawFiveDayAxis(days){
