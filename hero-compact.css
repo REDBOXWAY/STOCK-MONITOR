@@ -71,6 +71,10 @@
   white-space:nowrap!important;
 }
 
+.quote-change.muted{
+  color:#a88400!important;
+}
+
 .last-update{
   display:none!important;
 }
