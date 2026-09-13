@@ -16,27 +16,6 @@
     return type === 'CRYPTO' || symbol === 'BTC-USD' || symbol === 'ETH-USD';
   }
 
-  async function fetchCryptoQuote(item){
-    const symbol = encodeURIComponent(item.yahoo || item.ticker);
-    const response = await fetch(`${PROXY_BASE}/api/crypto?symbol=${symbol}&_=${Date.now()}`, {
-      cache:'no-store',
-      mode:'cors'
-    });
-    if(!response.ok) throw new Error(`CMC ${response.status}`);
-    const data = await response.json();
-    const price = finite(data.price);
-    const pct = finite(data.pct24h);
-    if(price == null) throw new Error('CMC NO PRICE');
-
-    let change = null;
-    if(pct != null && pct > -100){
-      const previous = price / (1 + pct / 100);
-      if(Number.isFinite(previous)) change = price - previous;
-    }
-
-    return { price, change, pct, source:'COINMARKETCAP' };
-  }
-
   async function fetchProxyQuote(item){
     const symbol = encodeURIComponent(item.yahoo || item.ticker);
     const response = await fetch(`${PROXY_BASE}/api/quote?symbol=${symbol}&_=${Date.now()}`, {
@@ -47,19 +26,29 @@
     const data = await response.json();
     const price = finite(data.price);
     if(price == null) throw new Error('PROXY NO PRICE');
-    return { price, change:finite(data.change), pct:finite(data.pct), source:data.source || 'YAHOO_VIA_VERCEL' };
+    return {
+      price,
+      change:finite(data.change),
+      pct:finite(data.pct),
+      source:data.source || 'YAHOO_VIA_VERCEL'
+    };
   }
 
   async function fetchDirectYahoo(item){
     const symbol = encodeURIComponent(item.yahoo || item.ticker);
     let lastError = null;
+
     for(const base of ['https://query2.finance.yahoo.com','https://query1.finance.yahoo.com']){
       try{
-        const response = await fetch(`${base}/v8/finance/chart/${symbol}?range=1d&interval=1m&includePrePost=true&stockMonitorLive=1&_=${Date.now()}`, { cache:'no-store' });
+        const response = await fetch(`${base}/v8/finance/chart/${symbol}?range=1d&interval=1m&includePrePost=true&stockMonitorLive=1&_=${Date.now()}`, {
+          cache:'no-store'
+        });
         if(!response.ok) throw new Error(`YAHOO ${response.status}`);
+
         const data = await response.json();
         const result = data?.chart?.result?.[0];
         if(!result) throw new Error('NO RESULT');
+
         const meta = result.meta || {};
         const closes = result?.indicators?.quote?.[0]?.close || [];
         let last = null;
@@ -69,9 +58,11 @@
             break;
           }
         }
+
         const price = finite(meta.regularMarketPrice) ?? finite(last);
         const prev = finite(meta.chartPreviousClose) ?? finite(meta.previousClose);
         if(price == null) throw new Error('NO PRICE');
+
         const change = prev != null ? price-prev : null;
         const pct = prev != null && prev !== 0 ? change/prev*100 : null;
         return {price,change,pct,source:'YAHOO_DIRECT'};
@@ -79,26 +70,11 @@
         lastError = error;
       }
     }
+
     throw lastError || new Error('DIRECT QUOTE FAILED');
   }
 
-  async function fetchLiveQuote(item){
-    if(isCrypto(item)){
-      try{
-        return await fetchCryptoQuote(item);
-      }catch(cmcError){
-        try{
-          return await fetchProxyQuote(item);
-        }catch(proxyError){
-          try{
-            return await fetchDirectYahoo(item);
-          }catch(_){
-            throw cmcError || proxyError;
-          }
-        }
-      }
-    }
-
+  async function fetchYahooQuote(item){
     try{
       return await fetchProxyQuote(item);
     }catch(proxyError){
@@ -110,9 +86,16 @@
     }
   }
 
+  async function fetchLiveQuote(item){
+    // Keep one price source per instrument class. BTC/crypto live quotes and
+    // chart history now both come from Yahoo (proxy first, direct Yahoo fallback).
+    return fetchYahooQuote(item);
+  }
+
   async function refreshLiveQuotes(){
     if(busy || document.hidden || !Array.isArray(watchlist) || !watchlist.length) return;
     busy = true;
+
     try{
       const snapshot = [...watchlist];
       const results = await Promise.allSettled(snapshot.map(fetchLiveQuote));
@@ -120,15 +103,29 @@
 
       results.forEach((result,index) => {
         if(result.status !== 'fulfilled') return;
+
         const source = snapshot[index];
         const item = watchlist.find(x => x.ticker === source.ticker);
         if(!item) return;
+
         const q = result.value;
         item.last = q.price;
         if(Number.isFinite(q.change)) item.change = q.change;
         if(Number.isFinite(q.pct)) item.pct = q.pct;
         item.quoteSource = q.source || '';
         changed = true;
+
+        if(isCrypto(item)){
+          window.dispatchEvent(new CustomEvent('stock-monitor-live-quote', {
+            detail:{
+              ticker:item.ticker,
+              yahoo:item.yahoo || item.ticker,
+              price:q.price,
+              source:q.source || 'YAHOO',
+              time:Date.now()
+            }
+          }));
+        }
       });
 
       if(changed){
