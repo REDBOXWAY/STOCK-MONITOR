@@ -105,13 +105,23 @@
     if(chartApi){try{chartApi.remove()}catch(_){}chartApi=null}
   }
 
-  function measureDateText(time){
-    let d=null;
-    if(typeof time==='number'&&Number.isFinite(time)) d=new Date(time*1000);
-    else if(typeof time==='string') d=new Date(`${time}T00:00:00Z`);
-    else if(time&&typeof time==='object'&&Number.isFinite(time.year)&&Number.isFinite(time.month)&&Number.isFinite(time.day)){
-      d=new Date(Date.UTC(time.year,time.month-1,time.day));
+  function timeToDate(time){
+    if(typeof time==='number'&&Number.isFinite(time)) return new Date(time*1000);
+    if(typeof time==='string') return new Date(`${time}T00:00:00Z`);
+    if(time&&typeof time==='object'&&Number.isFinite(time.year)&&Number.isFinite(time.month)&&Number.isFinite(time.day)){
+      return new Date(Date.UTC(time.year,time.month-1,time.day));
     }
+    return null;
+  }
+
+  function oneDayTickText(time){
+    const d=timeToDate(time);
+    if(!d||Number.isNaN(d.getTime())) return '';
+    return `${String(d.getUTCHours()).padStart(2,'0')}:00`;
+  }
+
+  function measureDateText(time){
+    const d=timeToDate(time);
     if(!d||Number.isNaN(d.getTime())) return '—';
 
     if(typeof activeRange!=='undefined' && activeRange==='1D'){
@@ -375,6 +385,7 @@
           borderColor:'#33444c',
           timeVisible:showTime,
           secondsVisible:false,
+          tickMarkFormatter:activeRange==='1D'?((time)=>oneDayTickText(time)):undefined,
           rightOffset:2,
           barSpacing:activeRange==='1D'?28:activeRange==='5D'?22:7,
           minBarSpacing:activeRange==='1D'?12:activeRange==='5D'?10:2,
