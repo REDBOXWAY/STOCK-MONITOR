@@ -15,7 +15,7 @@
     if(installed) return true;
     const LC=window.LightweightCharts;
     if(!LC||typeof LC.createChart!=='function') return false;
-    if(LC.__stockMonitorSixMonthAxis) return true;
+    if(LC.__stockMonitorSixMonthAxisV2) return true;
 
     const originalCreateChart=LC.createChart.bind(LC);
 
@@ -24,29 +24,51 @@
         return originalCreateChart(container,options);
       }
 
-      let api=null;
-      const formatter=(time)=>{
+      let mode='MONTH';
+
+      const monthFormatter=(time)=>{
         const d=asDate(time);
         if(!d||Number.isNaN(d.getTime())) return '';
+        return MONTHS[d.getUTCMonth()];
+      };
 
-        let visibleBars=999;
-        try{
-          const range=api?.timeScale().getVisibleLogicalRange();
-          if(range&&Number.isFinite(range.from)&&Number.isFinite(range.to)) visibleBars=range.to-range.from;
-        }catch(_){}
-
-        if(visibleBars>90) return MONTHS[d.getUTCMonth()];
+      const dateFormatter=(time)=>{
+        const d=asDate(time);
+        if(!d||Number.isNaN(d.getTime())) return '';
         return `${String(d.getUTCDate()).padStart(2,'0')} ${MONTHS[d.getUTCMonth()]}`;
       };
 
-      api=originalCreateChart(container,{
+      const api=originalCreateChart(container,{
         ...options,
         timeScale:{
           ...(options.timeScale||{}),
-          tickMarkFormatter:formatter
+          tickMarkFormatter:monthFormatter
         }
       });
 
+      const updateAxisMode=()=>{
+        let visibleBars=999;
+        try{
+          const range=api.timeScale().getVisibleLogicalRange();
+          if(range&&Number.isFinite(range.from)&&Number.isFinite(range.to)) visibleBars=range.to-range.from;
+        }catch(_){}
+
+        const nextMode=visibleBars>90?'MONTH':'DATE';
+        if(nextMode===mode) return;
+        mode=nextMode;
+
+        try{
+          api.timeScale().applyOptions({
+            tickMarkFormatter:mode==='MONTH'?monthFormatter:dateFormatter
+          });
+        }catch(_){}
+      };
+
+      try{
+        api.timeScale().subscribeVisibleLogicalRangeChange(updateAxisMode);
+      }catch(_){}
+
+      setTimeout(updateAxisMode,0);
       return api;
     };
 
@@ -61,12 +83,12 @@
         window.LightweightCharts={
           ...LC,
           createChart:wrappedCreateChart,
-          __stockMonitorSixMonthAxis:true
+          __stockMonitorSixMonthAxisV2:true
         };
         applied=window.LightweightCharts.createChart===wrappedCreateChart;
       }catch(_){}
     }else{
-      try{LC.__stockMonitorSixMonthAxis=true}catch(_){}
+      try{LC.__stockMonitorSixMonthAxisV2=true}catch(_){}
     }
 
     installed=applied;
