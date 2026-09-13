@@ -10,6 +10,7 @@
       return `${scaled.toFixed(decimals)} ${suffix}`;
     };
 
+    if (abs >= 1_000_000_000_000) return format(1_000_000_000_000, 'TRL');
     if (abs >= 1_000_000_000) return format(1_000_000_000, 'BLN');
     if (abs >= 1_000_000) return format(1_000_000, 'MLN');
     if (abs >= 1_000) return format(1_000, 'K');
