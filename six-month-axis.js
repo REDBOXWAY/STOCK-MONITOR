@@ -11,31 +11,36 @@
     return null;
   }
 
-  function isCalendarRange(){
-    return typeof activeRange!=='undefined'&&(activeRange==='6M'||activeRange==='YTD'||activeRange==='12M');
+  function isCustomRange(){
+    return typeof activeRange!=='undefined'&&(
+      activeRange==='6M'||activeRange==='YTD'||activeRange==='12M'||activeRange==='60M'
+    );
+  }
+
+  function dayStamp(time){
+    const d=asDate(time);
+    if(!d||Number.isNaN(d.getTime())) return null;
+    return Date.UTC(d.getUTCFullYear(),d.getUTCMonth(),d.getUTCDate())/86400000;
   }
 
   function install(){
     if(installed) return true;
     const LC=window.LightweightCharts;
     if(!LC||typeof LC.createChart!=='function') return false;
-    if(LC.__stockMonitorSixMonthCustomAxis) return true;
+    if(LC.__stockMonitorCustomCalendarAxisV5) return true;
 
     const originalCreateChart=LC.createChart.bind(LC);
 
     const wrappedCreateChart=function(container,options={}){
-      if(!isCalendarRange()){
-        return originalCreateChart(container,options);
-      }
+      if(!isCustomRange()) return originalCreateChart(container,options);
 
+      const rangeAtCreation=activeRange;
+      const isFiveYear=rangeAtCreation==='60M';
       container.style.position='relative';
 
       const api=originalCreateChart(container,{
         ...options,
-        timeScale:{
-          ...(options.timeScale||{}),
-          tickMarkFormatter:()=>''
-        }
+        timeScale:{...(options.timeScale||{}),tickMarkFormatter:()=>''}
       });
 
       let data=[];
@@ -44,8 +49,7 @@
 
       const overlay=document.createElement('div');
       Object.assign(overlay.style,{
-        position:'absolute',
-        left:'0',right:'0',bottom:'0',height:'32px',
+        position:'absolute',left:'0',right:'0',bottom:'0',height:'32px',
         zIndex:'8',pointerEvents:'none',overflow:'hidden'
       });
       container.appendChild(overlay);
@@ -56,11 +60,12 @@
         return `${String(d.getUTCDate()).padStart(2,'0')} ${MONTHS[d.getUTCMonth()]}`;
       }
 
-      function addLabel(text,x){
+      function addLabel(text,x,stamp=null){
         if(!text||!Number.isFinite(x)) return;
         const el=document.createElement('div');
         el.textContent=text;
         el.dataset.axisX=String(x);
+        if(Number.isFinite(stamp)) el.dataset.axisDay=String(stamp);
         Object.assign(el.style,{
           position:'absolute',top:'5px',left:`${x}px`,transform:'translateX(-50%)',
           whiteSpace:'nowrap',color:'#c8d0d4',font:'600 18px Trebuchet MS, sans-serif',
@@ -76,6 +81,25 @@
         }
       }
 
+      function yearLabels(startIndex,endIndex){
+        const groups=[];
+        let current=null;
+        for(let i=startIndex;i<=endIndex;i++){
+          const d=asDate(data[i]?.time);
+          if(!d) continue;
+          const year=d.getUTCFullYear();
+          if(!current||current.year!==year){
+            current={year,indices:[i]};
+            groups.push(current);
+          }else current.indices.push(i);
+        }
+        for(const g of groups){
+          const idx=g.indices[Math.floor(g.indices.length/2)];
+          const x=api.timeScale().timeToCoordinate(data[idx].time);
+          addLabel(String(g.year),x);
+        }
+      }
+
       function monthLabels(startIndex,endIndex){
         const groups=[];
         let current=null;
@@ -88,10 +112,13 @@
             groups.push(current);
           }else current.indices.push(i);
         }
+        let lastX=-Infinity;
         for(const g of groups){
           const idx=g.indices[Math.floor(g.indices.length/2)];
           const x=api.timeScale().timeToCoordinate(data[idx].time);
+          if(!Number.isFinite(x)||x-lastX<52) continue;
           addLabel(MONTHS[g.month],x);
+          lastX=x;
         }
       }
 
@@ -102,11 +129,18 @@
 
         let lastX=-Infinity;
         for(const idx of candidates){
-          const x=api.timeScale().timeToCoordinate(data[idx]?.time);
+          const row=data[idx];
+          const x=api.timeScale().timeToCoordinate(row?.time);
           if(!Number.isFinite(x)||x-lastX<62) continue;
-          addLabel(formatDate(data[idx]),x);
+          addLabel(formatDate(row),x,dayStamp(row?.time));
           lastX=x;
         }
+      }
+
+      function visibleDays(startIndex,endIndex){
+        const a=dayStamp(data[startIndex]?.time);
+        const b=dayStamp(data[endIndex]?.time);
+        return Number.isFinite(a)&&Number.isFinite(b)?Math.max(1,b-a):9999;
       }
 
       function draw(){
@@ -124,7 +158,18 @@
 
         const visibleBars=Math.max(1,range.to-range.from);
 
-        if(visibleBars>90){
+        if(isFiveYear){
+          const days=visibleDays(startIndex,endIndex);
+          if(days>730){
+            yearLabels(startIndex,endIndex);
+          }else if(days>120){
+            monthLabels(startIndex,endIndex);
+          }else if(days>60){
+            dateLabels(startIndex,endIndex,2);
+          }else{
+            dateLabels(startIndex,endIndex,1);
+          }
+        }else if(visibleBars>90){
           monthLabels(startIndex,endIndex);
         }else if(visibleBars>45){
           dateLabels(startIndex,endIndex,10);
@@ -165,11 +210,7 @@
           hideNearCrosshair();
         });
       }catch(_){}
-
-      try{
-        const ro=new ResizeObserver(queueDraw);
-        ro.observe(container);
-      }catch(_){}
+      try{new ResizeObserver(queueDraw).observe(container)}catch(_){}
 
       setTimeout(queueDraw,0);
       return api;
@@ -183,15 +224,11 @@
 
     if(!applied){
       try{
-        window.LightweightCharts={
-          ...LC,
-          createChart:wrappedCreateChart,
-          __stockMonitorSixMonthCustomAxis:true
-        };
+        window.LightweightCharts={...LC,createChart:wrappedCreateChart,__stockMonitorCustomCalendarAxisV5:true};
         applied=window.LightweightCharts.createChart===wrappedCreateChart;
       }catch(_){}
     }else{
-      try{LC.__stockMonitorSixMonthCustomAxis=true}catch(_){}
+      try{LC.__stockMonitorCustomCalendarAxisV5=true}catch(_){}
     }
 
     installed=applied;
