@@ -2,9 +2,18 @@
   const MONTHS=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
   const originalRenderChart=renderChart;
   let axisToken=0;
+  let oneDayClockTimer=null;
 
   function removeFiveDayAxis(){
     document.getElementById('fiveDayAxisOverlay')?.remove();
+  }
+
+  function removeOneDayAxis(){
+    document.getElementById('oneDayLocalAxisOverlay')?.remove();
+    if(oneDayClockTimer){
+      clearInterval(oneDayClockTimer);
+      oneDayClockTimer=null;
+    }
   }
 
   function formatDay(timestamp){
@@ -12,8 +21,6 @@
     return `${String(d.getUTCDate()).padStart(2,'0')} ${MONTHS[d.getUTCMonth()]}`;
   }
 
-  // One shared 5D calendar for every instrument.
-  // Example on 13 Sep: 08 SEP · 09 SEP · 10 SEP · 11 SEP · 12 SEP.
   function getFiveCalendarDays(){
     const now=new Date();
     const todayUtc=Date.UTC(now.getFullYear(),now.getMonth(),now.getDate())/1000;
@@ -41,18 +48,85 @@
       label.textContent=formatDay(t);
       Object.assign(label.style,{
         textAlign:'center',whiteSpace:'nowrap',color:'#c8d0d4',
-        font:'18px "Trebuchet MS",sans-serif',letterSpacing:'.5px'
+        font:'18px "Trebuchet MS",sans-serif',fontWeight:'700'
       });
       overlay.appendChild(label);
     }
     host.appendChild(overlay);
   }
 
+  function isCrypto(item){
+    const type=String(item?.type||'').toUpperCase();
+    const symbol=String(item?.yahoo||item?.ticker||'').toUpperCase();
+    return type==='CRYPTO'||symbol==='BTC-USD'||symbol==='BTCUSD'||symbol==='ETH-USD';
+  }
+
+  function oneDayHourLabels(){
+    const now=new Date();
+    now.setMinutes(0,0,0);
+    const labels=[];
+    for(let hoursAgo=24;hoursAgo>=0;hoursAgo-=3){
+      const d=new Date(now.getTime()-hoursAgo*60*60*1000);
+      labels.push(`${String(d.getHours()).padStart(2,'0')}:00`);
+    }
+    return labels;
+  }
+
+  function drawOneDayCryptoAxis(){
+    removeOneDayAxis();
+    const item=typeof selected==='function'?selected():null;
+    if(activeRange!=='1D'||!isCrypto(item)) return;
+
+    const host=document.getElementById('chartHost');
+    if(!host) return;
+    host.style.position='relative';
+
+    const labels=oneDayHourLabels();
+    const overlay=document.createElement('div');
+    overlay.id='oneDayLocalAxisOverlay';
+    Object.assign(overlay.style,{
+      position:'absolute',left:'0',right:'0',bottom:'0',height:'36px',zIndex:'31',
+      display:'grid',gridTemplateColumns:`repeat(${labels.length},1fr)`,alignItems:'center',
+      background:'#050b0e',borderTop:'1px solid #33444c',pointerEvents:'none',
+      padding:'0 66px 0 26px',boxSizing:'border-box'
+    });
+
+    labels.forEach(text=>{
+      const label=document.createElement('div');
+      label.textContent=text;
+      Object.assign(label.style,{
+        textAlign:'center',whiteSpace:'nowrap',color:'#c8d0d4',
+        font:'18px "Trebuchet MS",sans-serif',fontWeight:'700'
+      });
+      overlay.appendChild(label);
+    });
+
+    host.appendChild(overlay);
+    oneDayClockTimer=setInterval(()=>{
+      if(activeRange!=='1D'||!isCrypto(typeof selected==='function'?selected():null)){
+        removeOneDayAxis();
+        return;
+      }
+      const next=oneDayHourLabels();
+      const cells=overlay.children;
+      for(let i=0;i<cells.length&&i<next.length;i++) cells[i].textContent=next[i];
+    },60000);
+  }
+
   renderChart=async function(item){
     const token=++axisToken;
     removeFiveDayAxis();
+    removeOneDayAxis();
     await originalRenderChart(item);
-    if(token!==axisToken||activeRange!=='5D') return;
-    drawFiveDayAxis(getFiveCalendarDays());
+    if(token!==axisToken) return;
+
+    if(activeRange==='5D'){
+      drawFiveDayAxis(getFiveCalendarDays());
+      return;
+    }
+
+    if(activeRange==='1D'&&isCrypto(item)){
+      drawOneDayCryptoAxis();
+    }
   };
 })();
