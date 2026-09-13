@@ -102,6 +102,7 @@
       item.last = z.close;
       item.change = z.close - p.close;
       item.pct = 100 * item.change / p.close;
+      persist();
       renderWatchlist();
       renderHero(item);
       renderMetricsFromCandles(daily);
@@ -116,6 +117,24 @@
     }
   };
 
+  async function restoreMissingWatchlistQuotes(){
+    const missing = watchlist.filter(item => !Number.isFinite(item.last) || !Number.isFinite(item.change) || !Number.isFinite(item.pct));
+    if(!missing.length) return;
+    await Promise.allSettled(missing.map(async item => {
+      const daily = await fetchDailyCandles(item);
+      if(!daily || daily.length < 2) return;
+      const z = daily.at(-1), p = daily.at(-2);
+      item.last = z.close;
+      item.change = z.close - p.close;
+      item.pct = 100 * item.change / p.close;
+    }));
+    persist();
+    renderWatchlist();
+    const item = selected();
+    if(item) renderHero(item);
+  }
+
   marketDataCache.clear();
   renderTechnicals(selected());
+  restoreMissingWatchlistQuotes();
 })();
