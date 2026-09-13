@@ -3,13 +3,26 @@
   const originalRenderChart=renderChart;
   let axisToken=0;
   let oneDayClockTimer=null;
+  let oneMonthZoomLevel=0;
+  let oneMonthWheelHost=null;
+  let oneMonthWheelHandler=null;
 
   function removeFiveDayAxis(){
     document.getElementById('fiveDayAxisOverlay')?.remove();
   }
 
+  function detachOneMonthZoom(){
+    if(oneMonthWheelHost&&oneMonthWheelHandler){
+      oneMonthWheelHost.removeEventListener('wheel',oneMonthWheelHandler);
+    }
+    oneMonthWheelHost=null;
+    oneMonthWheelHandler=null;
+    oneMonthZoomLevel=0;
+  }
+
   function removeOneMonthAxis(){
     document.getElementById('oneMonthAxisOverlay')?.remove();
+    detachOneMonthZoom();
   }
 
   function removeOneDayAxis(){
@@ -26,7 +39,6 @@
   }
 
   // 5D includes today plus the previous four calendar days.
-  // Example on 13 Sep: 09 SEP · 10 SEP · 11 SEP · 12 SEP · 13 SEP.
   function getFiveCalendarDays(){
     const now=new Date();
     const todayUtc=Date.UTC(now.getFullYear(),now.getMonth(),now.getDate())/1000;
@@ -61,6 +73,9 @@
     host.appendChild(overlay);
   }
 
+  // 1M labels are anchored to TODAY and counted backward every 3 calendar days.
+  // Example on 13 Sep: 13 SEP -> 10 SEP -> 07 SEP ... -> 14 AUG.
+  // They are reversed before rendering so the axis still reads chronologically left-to-right.
   function getOneMonthLabels(){
     const now=new Date();
     const end=new Date(now.getFullYear(),now.getMonth(),now.getDate());
@@ -68,15 +83,31 @@
     start.setMonth(start.getMonth()-1);
 
     const labels=[];
-    const cursor=new Date(start);
-    while(cursor<=end){
+    const cursor=new Date(end);
+    while(cursor>=start){
       labels.push(Date.UTC(cursor.getFullYear(),cursor.getMonth(),cursor.getDate())/1000);
-      cursor.setDate(cursor.getDate()+3);
+      cursor.setDate(cursor.getDate()-3);
     }
+    return labels.reverse();
+  }
 
-    const endUtc=Date.UTC(end.getFullYear(),end.getMonth(),end.getDate())/1000;
-    if(labels[labels.length-1]!==endUtc) labels.push(endUtc);
-    return labels;
+  function attachOneMonthZoom(overlay){
+    const host=document.getElementById('chartHost');
+    if(!host||!overlay) return;
+
+    detachOneMonthZoom();
+    oneMonthWheelHost=host;
+    oneMonthWheelHandler=(event)=>{
+      if(activeRange!=='1M') return;
+
+      if(event.deltaY<0) oneMonthZoomLevel=Math.min(12,oneMonthZoomLevel+1);
+      else if(event.deltaY>0) oneMonthZoomLevel=Math.max(0,oneMonthZoomLevel-1);
+
+      // Default view: our clean 3-day calendar labels.
+      // Zoomed view: reveal Lightweight Charts' native daily axis underneath.
+      overlay.style.display=oneMonthZoomLevel>0?'none':'grid';
+    };
+    host.addEventListener('wheel',oneMonthWheelHandler,{passive:true});
   }
 
   function drawOneMonthAxis(days){
@@ -104,6 +135,7 @@
       overlay.appendChild(label);
     }
     host.appendChild(overlay);
+    attachOneMonthZoom(overlay);
   }
 
   function isCrypto(item){
