@@ -125,6 +125,13 @@
     return `${String(d.getUTCHours()).padStart(2,'0')}:00`;
   }
 
+  function oneMonthTickText(time){
+    const d=timeToDate(time);
+    if(!d||Number.isNaN(d.getTime())) return '';
+    const months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    return `${String(d.getUTCDate()).padStart(2,'0')} ${months[d.getUTCMonth()]}`;
+  }
+
   function measureDateText(time){
     const d=timeToDate(time);
     if(!d||Number.isNaN(d.getTime())) return '—';
@@ -390,7 +397,7 @@
           borderColor:'#33444c',
           timeVisible:showTime,
           secondsVisible:false,
-          tickMarkFormatter:activeRange==='1D'?((time)=>oneDayTickText(time)):undefined,
+          tickMarkFormatter:activeRange==='1D'?((time)=>oneDayTickText(time)):activeRange==='1M'?((time)=>oneMonthTickText(time)):undefined,
           rightOffset:2,
           barSpacing:activeRange==='1D'?28:activeRange==='5D'?22:7,
           minBarSpacing:activeRange==='1D'?12:activeRange==='5D'?10:2,
