@@ -76,7 +76,19 @@
     if(chartApi){try{chartApi.remove()}catch(_){}chartApi=null}
   }
 
-  function addMeasureTool(container,series){
+  function measureDateText(time){
+    let d=null;
+    if(typeof time==='number'&&Number.isFinite(time)) d=new Date(time*1000);
+    else if(typeof time==='string') d=new Date(`${time}T00:00:00Z`);
+    else if(time&&typeof time==='object'&&Number.isFinite(time.year)&&Number.isFinite(time.month)&&Number.isFinite(time.day)){
+      d=new Date(Date.UTC(time.year,time.month-1,time.day));
+    }
+    if(!d||Number.isNaN(d.getTime())) return '—';
+    const months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+    return `${String(d.getUTCDate()).padStart(2,'0')} ${months[d.getUTCMonth()]} '${String(d.getUTCFullYear()).slice(-2)}`;
+  }
+
+  function addMeasureTool(container,series,data){
     let enabled=false;
     let dragging=false;
     let start=null;
@@ -108,12 +120,19 @@
     });
     container.appendChild(hLine);
 
-    const vLine=document.createElement('div');
-    Object.assign(vLine.style,{
+    const startVLine=document.createElement('div');
+    Object.assign(startVLine.style,{
       position:'absolute',display:'none',zIndex:'16',pointerEvents:'none',width:'1px',
-      background:'#2962ff'
+      borderLeft:'1px dashed rgba(41,98,255,.9)',top:'0',bottom:'28px'
     });
-    container.appendChild(vLine);
+    container.appendChild(startVLine);
+
+    const endVLine=document.createElement('div');
+    Object.assign(endVLine.style,{
+      position:'absolute',display:'none',zIndex:'16',pointerEvents:'none',width:'1px',
+      borderLeft:'1px dashed rgba(41,98,255,.9)',top:'0',bottom:'28px'
+    });
+    container.appendChild(endVLine);
 
     const label=document.createElement('div');
     Object.assign(label.style,{
@@ -123,6 +142,21 @@
       letterSpacing:'1px',boxShadow:'0 2px 12px rgba(0,0,0,.35)'
     });
     container.appendChild(label);
+
+    function makeDateLabel(){
+      const el=document.createElement('div');
+      Object.assign(el.style,{
+        position:'absolute',display:'none',zIndex:'19',pointerEvents:'none',bottom:'0',
+        padding:'5px 9px',borderRadius:'4px',whiteSpace:'nowrap',
+        background:'#2962ff',color:'#fff',font:'18px "Bebas Neue",sans-serif',
+        letterSpacing:'.5px',boxShadow:'0 2px 10px rgba(0,0,0,.35)'
+      });
+      container.appendChild(el);
+      return el;
+    }
+
+    const startDateLabel=makeDateLabel();
+    const endDateLabel=makeDateLabel();
 
     function setMeasureMode(on){
       enabled=on;
@@ -136,17 +170,50 @@
 
     function pointFromEvent(e){
       const r=container.getBoundingClientRect();
-      const x=Math.max(0,Math.min(r.width,e.clientX-r.left));
+      const rawX=Math.max(0,Math.min(r.width,e.clientX-r.left));
       const y=Math.max(0,Math.min(r.height,e.clientY-r.top));
       const price=series.coordinateToPrice(y);
-      return {x,y,price};
+      let x=rawX;
+      let time=chartApi?.timeScale().coordinateToTime(rawX) ?? null;
+
+      // Snap the date to the nearest real trading bar so A/B always show a real market date.
+      const logical=chartApi?.timeScale().coordinateToLogical(rawX);
+      if(Number.isFinite(logical)&&Array.isArray(data)&&data.length){
+        const index=Math.max(0,Math.min(data.length-1,Math.round(logical)));
+        const row=data[index];
+        if(row){
+          time=row.time;
+          const snapped=chartApi?.timeScale().timeToCoordinate(row.time);
+          if(Number.isFinite(snapped)) x=snapped;
+        }
+      }
+      return {x,y,price,time};
+    }
+
+    function positionDateLabel(el,point,prefix){
+      if(!point||point.time==null){el.style.display='none';return;}
+      el.textContent=`${prefix} · ${measureDateText(point.time)}`;
+      el.style.display='block';
+      const w=el.offsetWidth||92;
+      const x=Math.min(container.clientWidth-w-3,Math.max(3,point.x-w/2));
+      el.style.left=`${x}px`;
+    }
+
+    function showStartAnchor(point){
+      if(!point) return;
+      startVLine.style.display='block';
+      startVLine.style.left=`${point.x}px`;
+      positionDateLabel(startDateLabel,point,'A');
     }
 
     function clearMeasure(){
       box.style.display='none';
       hLine.style.display='none';
-      vLine.style.display='none';
+      startVLine.style.display='none';
+      endVLine.style.display='none';
       label.style.display='none';
+      startDateLabel.style.display='none';
+      endDateLabel.style.display='none';
     }
 
     function drawMeasure(a,b){
@@ -154,6 +221,11 @@
       const left=Math.min(a.x,b.x), right=Math.max(a.x,b.x);
       const top=Math.min(a.y,b.y), bottom=Math.max(a.y,b.y);
       const pct=(b.price/a.price-1)*100;
+
+      showStartAnchor(a);
+      endVLine.style.display='block';
+      endVLine.style.left=`${b.x}px`;
+      positionDateLabel(endDateLabel,b,'B');
 
       box.style.display='block';
       box.style.left=`${left}px`;
@@ -165,11 +237,6 @@
       hLine.style.left=`${left}px`;
       hLine.style.top=`${b.y}px`;
       hLine.style.width=`${Math.max(1,right-left)}px`;
-
-      vLine.style.display='block';
-      vLine.style.left=`${b.x}px`;
-      vLine.style.top=`${top}px`;
-      vLine.style.height=`${Math.max(1,bottom-top)}px`;
 
       label.style.display='block';
       label.textContent=`${pct>=0?'+':''}${pct.toFixed(2)}%`;
@@ -193,6 +260,7 @@
       e.stopPropagation();
       clearMeasure();
       start=pointFromEvent(e);
+      showStartAnchor(start);
       dragging=true;
       container.setPointerCapture?.(e.pointerId);
     },true);
@@ -298,7 +366,7 @@
       });
       series.setData(data);
       chartApi.timeScale().fitContent();
-      addMeasureTool(container,series);
+      addMeasureTool(container,series,data);
 
       resizeObserver=new ResizeObserver(()=>{
         if(chartApi) chartApi.applyOptions({width:container.clientWidth,height:container.clientHeight});
