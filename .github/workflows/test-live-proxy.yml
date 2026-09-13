@@ -9,18 +9,19 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: TEST CMC RECENT BTC HISTORY
+      - name: WAIT FOR VERCEL
+        run: sleep 25
+
+      - name: TEST BTC PERFORMANCE
         run: |
           set -e
-          END=$(date +%s)
-          START=$((END-400*86400))
-          curl --fail --show-error --max-time 30 -o /tmp/cmc-history.json "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/historical?id=1&convertId=2781&timeStart=${START}&timeEnd=${END}"
+          curl --fail --show-error --max-time 40 -o /tmp/perf.json "https://stock-monitor-umber.vercel.app/api/crypto-performance?symbol=BTCUSD"
           python - <<'PY'
           import json
-          d=json.load(open('/tmp/cmc-history.json'))
-          q=(d.get('data') or {}).get('quotes',[])
-          print('count:',len(q))
-          print('first:',q[0]['timeOpen'] if q else None)
-          print('last:',q[-1]['timeClose'] if q else None)
-          assert len(q) > 300
+          d=json.load(open('/tmp/perf.json'))
+          print(json.dumps(d, indent=2))
+          assert d.get('source') == 'COINMARKETCAP', d
+          v=d.get('values') or {}
+          for k in ['day1','day5','month1','month6','ytd','year1','year5','year10','all']:
+            assert v.get(k) is not None, (k,d)
           PY
