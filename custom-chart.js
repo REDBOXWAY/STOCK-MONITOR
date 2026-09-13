@@ -65,11 +65,28 @@
     try{return await task}catch(e){historyCache.delete(cacheKey);throw e}
   }
 
+  function aggregate4H(rows){
+    if(!Array.isArray(rows)||!rows.length) return [];
+    const bucketSeconds=4*60*60;
+    const out=[];
+    let bucket=null;
+    let last=null;
+
+    for(const row of rows){
+      const nextBucket=Math.floor(row.time/bucketSeconds)*bucketSeconds;
+      if(bucket!==null && nextBucket!==bucket && last) out.push({time:last.time,value:last.value});
+      bucket=nextBucket;
+      last=row;
+    }
+    if(last) out.push({time:last.time,value:last.value});
+    return out;
+  }
+
   function rangeData(all,range){
     if(!Array.isArray(all)||!all.length) return [];
     const last=all[all.length-1].time;
     if(range==='1D') return all.filter(x=>x.time>=last-24*60*60);
-    if(range==='5D') return all.filter(x=>x.time>=last-5*24*60*60);
+    if(range==='5D') return aggregate4H(all.filter(x=>x.time>=last-5*24*60*60));
     return all;
   }
 
@@ -321,7 +338,7 @@
       host.appendChild(container);
 
       const LC=window.LightweightCharts;
-      const intraday=activeRange==='1D'||activeRange==='5D';
+      const showTime=activeRange==='1D';
 
       chartApi=LC.createChart(container,{
         autoSize:true,
@@ -345,11 +362,11 @@
         timeScale:{
           borderVisible:true,
           borderColor:'#33444c',
-          timeVisible:intraday,
+          timeVisible:showTime,
           secondsVisible:false,
           rightOffset:2,
-          barSpacing:activeRange==='1D'?28:activeRange==='5D'?8:7,
-          minBarSpacing:activeRange==='1D'?12:activeRange==='5D'?3:2,
+          barSpacing:activeRange==='1D'?28:activeRange==='5D'?22:7,
+          minBarSpacing:activeRange==='1D'?12:activeRange==='5D'?10:2,
           fixLeftEdge:true,
           fixRightEdge:true
         },
