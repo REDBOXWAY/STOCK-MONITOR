@@ -1,5 +1,6 @@
 (() => {
   const LWC_SRC = 'https://cdn.jsdelivr.net/npm/lightweight-charts@5.2.1/dist/lightweight-charts.standalone.production.js';
+  const VERCEL_PROXY = 'https://stock-monitor-umber.vercel.app';
   const historyCache = new Map();
   let chartApi = null;
   let resizeObserver = null;
@@ -22,28 +23,37 @@
     });
   }
 
-  async function fetchHistory(item){
+  async function fetchHistory(item, range){
     const key=item.yahoo||item.ticker;
-    if(historyCache.has(key)) return historyCache.get(key);
+    const intraday=range==='1D';
+    const cacheKey=`${key}|${intraday?'1d-1h':'max-1d'}`;
+    if(historyCache.has(cacheKey)) return historyCache.get(cacheKey);
+
     const task=(async()=>{
       const symbol=encodeURIComponent(key);
-      const url=`https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=max&interval=1d&includePrePost=false&events=div%2Csplits`;
-      const r=await fetch(url,{cache:'no-store'});
+      const url=intraday
+        ? `${VERCEL_PROXY}/api/history?symbol=${symbol}&range=1d&interval=1h&_=${Date.now()}`
+        : `https://query1.finance.yahoo.com/v8/finance/chart/${symbol}?range=max&interval=1d&includePrePost=false&events=div%2Csplits`;
+
+      const r=await fetch(url,{cache:'no-store',mode:intraday?'cors':undefined});
       if(!r.ok) throw new Error(`MARKET DATA ${r.status}`);
       const d=await r.json();
       const res=d?.chart?.result?.[0];
       const q=res?.indicators?.quote?.[0];
       if(!res||!q) throw new Error('NO MARKET DATA');
+
       const rows=[];
       (res.timestamp||[]).forEach((t,i)=>{
         const close=q.close?.[i];
         if(Number.isFinite(close)) rows.push({time:t,value:close});
       });
+
       if(rows.length<2) throw new Error('NOT ENOUGH HISTORY');
       return rows;
     })();
-    historyCache.set(key,task);
-    try{return await task}catch(e){historyCache.delete(key);throw e}
+
+    historyCache.set(cacheKey,task);
+    try{return await task}catch(e){historyCache.delete(cacheKey);throw e}
   }
 
   function subtractYears(ts,years){
@@ -56,7 +66,7 @@
     if(!all.length) return all;
     const last=all[all.length-1].time;
     if(range==='ALL') return all;
-    if(range==='1D') return all.slice(-2);
+    if(range==='1D') return all;
     if(range==='5D') return all.slice(-6);
     if(range==='1M') return all.slice(-23);
     if(range==='6M') return all.slice(-132);
@@ -84,6 +94,11 @@
       d=new Date(Date.UTC(time.year,time.month-1,time.day));
     }
     if(!d||Number.isNaN(d.getTime())) return '—';
+
+    if(typeof activeRange!=='undefined' && activeRange==='1D'){
+      return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
+    }
+
     const months=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
     return `${String(d.getUTCDate()).padStart(2,'0')} ${months[d.getUTCMonth()]} '${String(d.getUTCFullYear()).slice(-2)}`;
   }
@@ -176,7 +191,6 @@
       let x=rawX;
       let time=chartApi?.timeScale().coordinateToTime(rawX) ?? null;
 
-      // Snap the date to the nearest real trading bar so A/B always show a real market date.
       const logical=chartApi?.timeScale().coordinateToLogical(rawX);
       if(Number.isFinite(logical)&&Array.isArray(data)&&data.length){
         const index=Math.max(0,Math.min(data.length-1,Math.round(logical)));
@@ -300,7 +314,7 @@
 
     try{
       await loadLightweightCharts();
-      const history=await fetchHistory(item);
+      const history=await fetchHistory(item,activeRange);
       if(token!==renderToken) return;
       const data=rangeData(history,activeRange);
       if(data.length<2) throw new Error('NOT ENOUGH RANGE DATA');
@@ -312,6 +326,8 @@
       host.appendChild(container);
 
       const LC=window.LightweightCharts;
+      const intraday=activeRange==='1D';
+
       chartApi=LC.createChart(container,{
         autoSize:true,
         layout:{
@@ -334,11 +350,11 @@
         timeScale:{
           borderVisible:true,
           borderColor:'#33444c',
-          timeVisible:false,
+          timeVisible:intraday,
           secondsVisible:false,
           rightOffset:2,
-          barSpacing:7,
-          minBarSpacing:2,
+          barSpacing:intraday?28:7,
+          minBarSpacing:intraday?12:2,
           fixLeftEdge:true,
           fixRightEdge:true
         },
@@ -364,6 +380,7 @@
         crosshairMarkerRadius:4,
         priceFormat:{type:'price',precision:2,minMove:.01}
       });
+
       series.setData(data);
       chartApi.timeScale().fitContent();
       addMeasureTool(container,series,data);
