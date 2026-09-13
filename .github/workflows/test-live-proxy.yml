@@ -1,0 +1,15 @@
+name: TEST LIVE PROXY
+
+on:
+  push:
+    paths:
+      - '.github/workflows/test-live-proxy.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: TEST GDX QUOTE
+        run: |
+          set -e
+          curl -i --fail --show-error --max-time 20 'https://stock-monitor-live-proxy-anar4.vercel.app/api/quote?symbol=GDX'
