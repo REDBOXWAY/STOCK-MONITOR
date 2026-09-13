@@ -3,6 +3,11 @@
   let liveRefreshBusy = false;
   let liveRefreshTimer = null;
 
+  function finite(value){
+    const n = Number(value);
+    return Number.isFinite(n) ? n : null;
+  }
+
   function latestFinite(values){
     if(!Array.isArray(values)) return null;
     for(let i=values.length-1;i>=0;i--){
@@ -11,44 +16,99 @@
     return null;
   }
 
-  async function fetchLiveQuote(item){
-    const symbol = encodeURIComponent(item.yahoo || item.ticker);
-    const stamp = Date.now();
-    const path = `/v8/finance/chart/${symbol}?range=1d&interval=1m&includePrePost=true&events=div%2Csplits&stockMonitorLive=1&_=${stamp}`;
-    const urls = [
-      `https://query2.finance.yahoo.com${path}`,
-      `https://query1.finance.yahoo.com${path}`
-    ];
+  function buildQuote(price, change, pct, previousClose){
+    const p = finite(price);
+    let c = finite(change);
+    let pc = finite(pct);
+    const prev = finite(previousClose);
+    if(p == null) return null;
+    if(c == null && prev != null) c = p - prev;
+    if(pc == null && c != null && prev != null && prev !== 0) pc = 100 * c / prev;
+    return {price:p,change:c,pct:pc};
+  }
 
+  async function fetchFromSearch(item){
+    const raw = String(item.yahoo || item.ticker || '').trim().toUpperCase();
+    if(!raw) throw new Error('NO SYMBOL');
+    const params = new URLSearchParams({
+      q: raw,
+      quotesCount: '20',
+      newsCount: '0',
+      listsCount: '0',
+      enableFuzzyQuery: 'false',
+      enableNavLinks: 'false',
+      _: String(Date.now())
+    });
     let lastError = null;
-    for(const url of urls){
+    for(const base of ['https://query2.finance.yahoo.com','https://query1.finance.yahoo.com']){
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 4200);
       try{
-        const response = await fetch(url,{cache:'no-store',signal:controller.signal});
-        if(!response.ok) throw new Error(`LIVE QUOTE ${response.status}`);
+        const response = await fetch(`${base}/v1/finance/search?${params}`,{cache:'no-store',signal:controller.signal});
+        if(!response.ok) throw new Error(`SEARCH QUOTE ${response.status}`);
         const data = await response.json();
-        const result = data?.chart?.result?.[0];
-        if(!result) throw new Error('NO LIVE QUOTE');
-
-        const meta = result.meta || {};
-        const closes = result?.indicators?.quote?.[0]?.close || [];
-        const latestClose = latestFinite(closes);
-        const price = Number.isFinite(meta.regularMarketPrice) ? meta.regularMarketPrice : latestClose;
-        const previousClose = Number.isFinite(meta.chartPreviousClose) ? meta.chartPreviousClose :
-          Number.isFinite(meta.previousClose) ? meta.previousClose : null;
-
-        if(!Number.isFinite(price)) throw new Error('NO LIVE PRICE');
-        const change = Number.isFinite(previousClose) ? price - previousClose : null;
-        const pct = Number.isFinite(previousClose) && previousClose !== 0 ? 100 * change / previousClose : null;
-        return {price,change,pct};
+        const quote = (data?.quotes || []).find(q => String(q?.symbol || '').toUpperCase() === raw);
+        if(!quote) throw new Error('SYMBOL NOT IN SEARCH');
+        const result = buildQuote(
+          quote.regularMarketPrice,
+          quote.regularMarketChange,
+          quote.regularMarketChangePercent,
+          quote.regularMarketPreviousClose ?? quote.previousClose
+        );
+        if(result) return result;
+        throw new Error('SEARCH HAS NO PRICE');
       }catch(error){
         lastError = error;
       }finally{
         clearTimeout(timeout);
       }
     }
-    throw lastError || new Error('LIVE QUOTE FAILED');
+    throw lastError || new Error('SEARCH QUOTE FAILED');
+  }
+
+  async function fetchFromChart(item){
+    const symbol = encodeURIComponent(item.yahoo || item.ticker);
+    const stamp = Date.now();
+    const path = `/v8/finance/chart/${symbol}?range=1d&interval=1m&includePrePost=true&events=div%2Csplits&stockMonitorLive=1&_=${stamp}`;
+    let lastError = null;
+    for(const base of ['https://query2.finance.yahoo.com','https://query1.finance.yahoo.com']){
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 4200);
+      try{
+        const response = await fetch(`${base}${path}`,{cache:'no-store',signal:controller.signal});
+        if(!response.ok) throw new Error(`LIVE QUOTE ${response.status}`);
+        const data = await response.json();
+        const result = data?.chart?.result?.[0];
+        if(!result) throw new Error('NO LIVE QUOTE');
+        const meta = result.meta || {};
+        const latestClose = latestFinite(result?.indicators?.quote?.[0]?.close || []);
+        const quote = buildQuote(
+          Number.isFinite(meta.regularMarketPrice) ? meta.regularMarketPrice : latestClose,
+          null,
+          null,
+          Number.isFinite(meta.chartPreviousClose) ? meta.chartPreviousClose : meta.previousClose
+        );
+        if(quote) return quote;
+        throw new Error('NO LIVE PRICE');
+      }catch(error){
+        lastError = error;
+      }finally{
+        clearTimeout(timeout);
+      }
+    }
+    throw lastError || new Error('CHART QUOTE FAILED');
+  }
+
+  async function fetchLiveQuote(item){
+    try{
+      return await fetchFromSearch(item);
+    }catch(searchError){
+      try{
+        return await fetchFromChart(item);
+      }catch(chartError){
+        throw chartError || searchError;
+      }
+    }
   }
 
   async function refreshLiveQuotes(){
@@ -90,9 +150,21 @@
     liveRefreshTimer = setInterval(refreshLiveQuotes,REFRESH_MS);
   }
 
+  window.refreshLiveQuotesNow = refreshLiveQuotes;
+
   document.addEventListener('visibilitychange',() => {
     if(!document.hidden) refreshLiveQuotes();
   });
+
+  const rows = document.getElementById('watchRows');
+  if(rows && window.MutationObserver){
+    let mutationTimer = null;
+    const observer = new MutationObserver(() => {
+      clearTimeout(mutationTimer);
+      mutationTimer = setTimeout(refreshLiveQuotes,80);
+    });
+    observer.observe(rows,{childList:true,subtree:false});
+  }
 
   startLiveQuotes();
 })();
