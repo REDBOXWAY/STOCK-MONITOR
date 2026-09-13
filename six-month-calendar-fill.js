@@ -23,7 +23,7 @@
 
   function fill(){
     timer=null;
-    if(typeof activeRange==='undefined'||(activeRange!=='6M'&&activeRange!=='YTD')) return;
+    if(typeof activeRange==='undefined'||(activeRange!=='6M'&&activeRange!=='YTD'&&activeRange!=='12M')) return;
     const host=document.getElementById('chartHost');
     if(!host) return;
 
