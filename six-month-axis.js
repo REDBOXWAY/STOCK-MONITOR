@@ -11,6 +11,10 @@
     return null;
   }
 
+  function isCalendarRange(){
+    return typeof activeRange!=='undefined'&&(activeRange==='6M'||activeRange==='YTD');
+  }
+
   function install(){
     if(installed) return true;
     const LC=window.LightweightCharts;
@@ -20,7 +24,7 @@
     const originalCreateChart=LC.createChart.bind(LC);
 
     const wrappedCreateChart=function(container,options={}){
-      if(typeof activeRange==='undefined'||activeRange!=='6M'){
+      if(!isCalendarRange()){
         return originalCreateChart(container,options);
       }
 
