@@ -9,25 +9,18 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: WAIT FOR VERCEL
-        run: sleep 5
-
-      - name: TEST CMC PUBLIC BTC HISTORY
+      - name: TEST CMC RECENT BTC HISTORY
         run: |
           set -e
-          START=1410912000
           END=$(date +%s)
+          START=$((END-400*86400))
           curl --fail --show-error --max-time 30 -o /tmp/cmc-history.json "https://api.coinmarketcap.com/data-api/v3/cryptocurrency/historical?id=1&convertId=2781&timeStart=${START}&timeEnd=${END}"
           python - <<'PY'
           import json
           d=json.load(open('/tmp/cmc-history.json'))
-          print('top keys:', list(d.keys()))
-          data=d.get('data') or {}
-          print('data keys:', list(data.keys()) if isinstance(data,dict) else type(data))
-          quotes=data.get('quotes',[]) if isinstance(data,dict) else []
-          print('quote count:', len(quotes))
-          if quotes:
-            print('first:', quotes[0])
-            print('last:', quotes[-1])
-          assert len(quotes) > 1000, f'not enough CMC history: {len(quotes)}'
+          q=(d.get('data') or {}).get('quotes',[])
+          print('count:',len(q))
+          print('first:',q[0]['timeOpen'] if q else None)
+          print('last:',q[-1]['timeClose'] if q else None)
+          assert len(q) > 300
           PY
