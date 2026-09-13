@@ -9,7 +9,7 @@
 
   function supportedRange(){
     return typeof activeRange!=='undefined'&&(
-      activeRange==='6M'||activeRange==='YTD'||activeRange==='12M'||activeRange==='60M'
+      activeRange==='6M'||activeRange==='YTD'||activeRange==='12M'||activeRange==='60M'||activeRange==='120M'
     );
   }
 
