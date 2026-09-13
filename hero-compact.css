@@ -1,4 +1,4 @@
-/* COMPACT ONE-LINE HERO: logo/ticker/tags/price/change on one row, chart uses freed space */
+/* COMPACT ONE-LINE HERO: ticker/tags/price/change on one row, chart uses freed space */
 .hero{
   display:flex!important;
   align-items:center!important;
@@ -23,9 +23,7 @@
 }
 
 .company-logo{
-  width:72px!important;
-  height:72px!important;
-  flex:0 0 72px!important;
+  display:none!important;
 }
 
 .ticker{
@@ -95,7 +93,7 @@
 
 @media(max-width:900px){
   .hero{flex-wrap:wrap!important;align-items:flex-start!important}
-  .quote{width:100%!important;margin-left:84px!important;justify-content:flex-start!important}
+  .quote{width:100%!important;margin-left:0!important;justify-content:flex-start!important}
   .company>div{flex-wrap:wrap!important}
   .tags{flex-wrap:wrap!important}
   #chartHost{height:390px!important}
