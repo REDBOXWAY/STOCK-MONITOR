@@ -6,7 +6,7 @@
   let chartMode=localStorage.getItem('stock-monitor-chart-mode')||'LINE';
   if(!MODES.includes(chartMode)) chartMode='LINE';
 
-  let latestHistory=[];
+  const historyByKey=new Map();
   let installed=false;
 
   function requestUrl(input){
@@ -15,7 +15,36 @@
     return '';
   }
 
-  function captureHistory(data){
+  function rangeConfig(range){
+    if(range==='1D') return {range:'5d',interval:'1h'};
+    if(range==='5D') return {range:'1mo',interval:'1h'};
+    if(range==='1M') return {range:'1mo',interval:'1d'};
+    if(range==='6M') return {range:'6mo',interval:'1d'};
+    if(range==='YTD') return {range:'ytd',interval:'1d'};
+    if(range==='12M') return {range:'1y',interval:'1d'};
+    if(range==='60M') return {range:'5y',interval:'1wk'};
+    if(range==='120M') return {range:'10y',interval:'1wk'};
+    return {range:'max',interval:'1mo'};
+  }
+
+  function historyKey(symbol,range,interval){
+    return `${String(symbol||'').trim().toUpperCase()}|${range}|${interval}`;
+  }
+
+  function keyFromUrl(url){
+    try{
+      const u=new URL(url,window.location.href);
+      const symbol=u.searchParams.get('symbol');
+      const range=u.searchParams.get('range');
+      const interval=u.searchParams.get('interval');
+      if(!symbol||!range||!interval) return null;
+      return historyKey(symbol,range,interval);
+    }catch(_){
+      return null;
+    }
+  }
+
+  function captureHistory(data,url){
     const res=data?.chart?.result?.[0];
     const q=res?.indicators?.quote?.[0];
     if(!res||!q) return;
@@ -32,7 +61,15 @@
         rows.push({time,open:close,high:close,low:close,close});
       }
     });
-    if(rows.length) latestHistory=rows;
+
+    const key=keyFromUrl(url);
+    if(rows.length&&key){
+      historyByKey.set(key,rows);
+      if(historyByKey.size>80){
+        const oldest=historyByKey.keys().next().value;
+        historyByKey.delete(oldest);
+      }
+    }
   }
 
   const originalFetch=window.fetch.bind(window);
@@ -42,7 +79,7 @@
     if(url.includes('/api/history?')&&response.ok){
       try{
         const data=await response.clone().json();
-        captureHistory(data);
+        captureHistory(data,url);
       }catch(_){}
     }
     return response;
@@ -52,17 +89,28 @@
     try{return typeof activeRange!=='undefined'?activeRange:''}catch(_){return ''}
   }
 
+  function currentHistory(){
+    try{
+      const item=typeof selected==='function'?selected():null;
+      if(!item) return [];
+      const cfg=rangeConfig(currentRange());
+      return historyByKey.get(historyKey(item.yahoo||item.ticker,cfg.range,cfg.interval))||[];
+    }catch(_){
+      return [];
+    }
+  }
+
   function synthetic(row){
     const v=Number(row?.value);
     if(!Number.isFinite(v)) return null;
     return {time:row.time,open:v,high:v,low:v,close:v};
   }
 
-  function aggregateBuckets(targetRows,bucketSeconds){
+  function aggregateBuckets(targetRows,bucketSeconds,sourceRows){
     const wanted=new Set(targetRows.map(row=>Math.floor(Number(row.time)/bucketSeconds)));
     const buckets=new Map();
 
-    for(const row of latestHistory){
+    for(const row of sourceRows){
       const key=Math.floor(Number(row.time)/bucketSeconds);
       if(!wanted.has(key)) continue;
       const current=buckets.get(key);
@@ -85,11 +133,13 @@
   function candleRows(lineRows){
     if(!Array.isArray(lineRows)||!lineRows.length) return [];
     const range=currentRange();
+    const sourceRows=currentHistory();
 
-    if(range==='1D') return aggregateBuckets(lineRows,60*60);
-    if(range==='5D') return aggregateBuckets(lineRows,4*60*60);
+    if(!sourceRows.length) return lineRows.map(synthetic).filter(Boolean);
+    if(range==='1D') return aggregateBuckets(lineRows,60*60,sourceRows);
+    if(range==='5D') return aggregateBuckets(lineRows,4*60*60,sourceRows);
 
-    const byTime=new Map(latestHistory.map(row=>[Number(row.time),row]));
+    const byTime=new Map(sourceRows.map(row=>[Number(row.time),row]));
     return lineRows.map(row=>{
       const raw=byTime.get(Number(row.time));
       if(raw){
