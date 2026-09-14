@@ -1,0 +1,50 @@
+name: INTEGRITY CHECK
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '*.js'
+      - 'index.html'
+      - 'api/**'
+      - 'scripts/**'
+      - '.github/workflows/integrity-check.yml'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: CHECKOUT
+        uses: actions/checkout@v4
+
+      - name: SETUP NODE
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: CHECK BROWSER JAVASCRIPT SYNTAX
+        run: |
+          set -e
+          find . -maxdepth 1 -type f -name '*.js' -print0 | sort -z | xargs -0 -n1 node --check
+
+      - name: CHECK INDEX LOCAL SCRIPT REFERENCES
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import re
+          html=Path('index.html').read_text(encoding='utf-8')
+          missing=[]
+          for src in re.findall(r'<script\s+src="([^"]+)"', html):
+              if src.startswith(('http://','https://')):
+                  continue
+              path=src.split('?',1)[0]
+              if not Path(path).exists():
+                  missing.append(path)
+          if missing:
+              raise SystemExit('Missing local scripts: '+', '.join(missing))
+          print('All local script references exist')
+          PY
+
+      - name: CHECK MARKET UPDATE PYTHON
+        run: python -m py_compile scripts/update_market_data.py
