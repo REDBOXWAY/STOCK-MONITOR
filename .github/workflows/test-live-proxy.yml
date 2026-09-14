@@ -1,8 +1,14 @@
 name: TEST LIVE PROXY
 
 on:
+  workflow_dispatch:
   push:
+    branches: [main]
     paths:
+      - 'api/history.js'
+      - 'custom-chart.js'
+      - 'chart-type-mode.js'
+      - 'data-proxy.js'
       - '.github/workflows/test-live-proxy.yml'
 
 jobs:
