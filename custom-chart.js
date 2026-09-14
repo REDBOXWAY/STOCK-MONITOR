@@ -4,6 +4,7 @@
   const historyCache = new Map();
   let chartApi = null;
   let resizeObserver = null;
+  let measureCleanup = null;
   let renderToken = 0;
 
   function loadLightweightCharts(){
@@ -39,7 +40,9 @@
     const key=item.yahoo||item.ticker;
     const cfg=historyConfig(range);
     const cacheKey=`${key}|${cfg.range}|${cfg.interval}`;
-    if(historyCache.has(cacheKey)) return historyCache.get(cacheKey);
+    const ttl=cfg.intraday?60000:300000;
+    const cached=historyCache.get(cacheKey);
+    if(cached&&Date.now()-cached.time<ttl) return cached.task;
 
     const task=(async()=>{
       const symbol=encodeURIComponent(key);
@@ -61,8 +64,13 @@
       return rows;
     })();
 
-    historyCache.set(cacheKey,task);
-    try{return await task}catch(e){historyCache.delete(cacheKey);throw e}
+    historyCache.set(cacheKey,{time:Date.now(),task});
+    try{
+      return await task;
+    }catch(e){
+      if(historyCache.get(cacheKey)?.task===task) historyCache.delete(cacheKey);
+      throw e;
+    }
   }
 
   function aggregate4H(rows){
@@ -106,6 +114,7 @@
   }
 
   function destroyChart(){
+    if(measureCleanup){try{measureCleanup()}catch(_){}measureCleanup=null}
     if(resizeObserver){resizeObserver.disconnect();resizeObserver=null}
     if(chartApi){try{chartApi.remove()}catch(_){}chartApi=null}
   }
@@ -352,12 +361,14 @@
 
     container.addEventListener('pointercancel',()=>{dragging=false},true);
 
-    window.addEventListener('keydown',e=>{
+    const escapeHandler=e=>{
       if(e.key==='Escape'&&enabled){
         clearMeasure();
         setMeasureMode(false);
       }
-    },{once:false});
+    };
+    window.addEventListener('keydown',escapeHandler);
+    return ()=>window.removeEventListener('keydown',escapeHandler);
   }
 
   renderChart = async function(item){
@@ -443,7 +454,7 @@
 
       series.setData(data);
       chartApi.timeScale().fitContent();
-      addMeasureTool(container,series,data);
+      measureCleanup=addMeasureTool(container,series,data);
 
       resizeObserver=new ResizeObserver(()=>{
         if(chartApi) chartApi.applyOptions({width:container.clientWidth,height:container.clientHeight});
