@@ -44,6 +44,14 @@ jobs:
           assert len(d5)>=100, ('5D rolling points',len(d5))
           print(f'5D: {len(d5)} hourly points, rolling 5 days')
 
+          # This is the exact daily history request used by BTC TECHNICALS,
+          # METRICS and the downstream performance render path.
+          ts=get('2y','1d')
+          span=(ts[-1]-ts[0])/86400
+          assert len(ts)>=600, ('BTC TECHNICAL daily points',len(ts))
+          assert span>=650, ('BTC TECHNICAL daily span',span)
+          print(f'BTC TECHNICAL: {len(ts)} daily points, {span:.1f} days')
+
           tests=[
             ('1M','1mo','1d',20,25),
             ('6M','6mo','1d',150,160),
