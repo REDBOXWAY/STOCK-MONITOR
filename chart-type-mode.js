@@ -1,7 +1,8 @@
 (() => {
   const MODES=['LINE','CANDLES'];
-  const UP_COLOR='#2962FF';
+  const UP_COLOR='#00E6B3';
   const DOWN_COLOR='#FF4058';
+  const PRICE_LINE_COLOR='#2962FF';
   let chartMode=localStorage.getItem('stock-monitor-chart-mode')||'LINE';
   if(!MODES.includes(chartMode)) chartMode='LINE';
 
@@ -122,7 +123,7 @@
           wickUpColor:UP_COLOR,
           wickDownColor:DOWN_COLOR,
           priceLineVisible:true,
-          priceLineColor:UP_COLOR,
+          priceLineColor:PRICE_LINE_COLOR,
           priceLineWidth:1,
           lastValueVisible:true,
           priceFormat:seriesOptions?.priceFormat||{type:'price',precision:2,minMove:.01}
